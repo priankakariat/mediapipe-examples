@@ -30,7 +30,6 @@ class ViewController: UIViewController {
   private let inferenceIntervalMs: Double = 100
   private let inferenceBottomHeight = 220.0
   private let expandButtonHeight = 41.0
-  private let edgeOffset: CGFloat = 2.0
   private let labelOffset: CGFloat = 10.0
   private let displayFont = UIFont.systemFont(ofSize: 14.0, weight: .medium)
   private let labelColors = [
@@ -47,31 +46,12 @@ class ViewController: UIViewController {
   ]
   private let playerViewController = AVPlayerViewController()
   private var generator:AVAssetImageGenerator?
-  var orientation: UIImage.Orientation {
-    get {
-      switch UIDevice.current.orientation {
-      case .landscapeLeft:
-        return .left
-      case .landscapeRight:
-        return .right
-      default:
-        return .up
-      }
-    }
-  }
 
   // MARK: Instance Variables
-//  private var videoDetectTimer: Timer?
-//  private var previousInferenceTimeMs = Date.distantPast.timeIntervalSince1970 * 1000
   private var maxResults = DefaultConstants.maxResults
   private var scoreThreshold = DefaultConstants.scoreThreshold
   private var model = DefaultConstants.model
   private var runningMode: RunningMode = .liveStream
-
-//  let backgroundQueue = DispatchQueue(
-//      label: "com.google.mediapipe.ObjectDetection",
-//      qos: .userInteractive
-//    )
 
   // MARK: Controllers that manage functionality
   // Handles the presenting of results on the screen
@@ -84,7 +64,7 @@ class ViewController: UIViewController {
     super.viewDidLoad()
     // Create object detector helper
     
-    inferenceViewController?.isUIEnabled = false
+    inferenceViewController?.isUIEnabled = true
     runningModeTabbar.selectedItem = runningModeTabbar.items?.first
     runningModeTabbar.delegate = self
     guard let viewController = UIStoryboard(name: "Main", bundle: .main).instantiateViewController(withIdentifier: "CAMERA_VIEW_CONTROLLER") as? CameraViewController else {
@@ -94,9 +74,7 @@ class ViewController: UIViewController {
     viewController.interfaceUpdatesDelegate = self
     cameraViewController = viewController
     switchTo(childViewController: viewController, fromViewController: nil)
-    
-    overlayView.clearsContextBeforeDrawing = true
-    
+        
     NotificationCenter.default.addObserver(self, selector: #selector(orientationChanged), name: UIDevice.orientationDidChangeNotification, object: nil)
     
   }
@@ -119,14 +97,6 @@ class ViewController: UIViewController {
      default:
         break
     }
-//    switch orientation {
-//      case .up:
-//
-//      case .left:
-//      case .right:
-//      default:
-//        break
-//    }
   }
 
   // MARK: Storyboard Segue Handlers
@@ -143,100 +113,100 @@ class ViewController: UIViewController {
     }
   }
 
-  // MARK: Handle ovelay function
-  /**
-   This method takes the results, translates the bounding box rects to the current view, draws the bounding boxes, classNames and confidence scores of inferences.
-   */
-  private func drawAfterPerformingCalculations(onDetections detections: [Detection], orientation: UIImage.Orientation, withImageSize imageSize: CGSize) {
+//  // MARK: Handle ovelay function
+//  /**
+//   This method takes the results, translates the bounding box rects to the current view, draws the bounding boxes, classNames and confidence scores of inferences.
+//   */
+//  private func drawAfterPerformingCalculations(onDetections detections: [Detection], orientation: UIImage.Orientation, withImageSize imageSize: CGSize) {
+//
+//    self.overlayView.objectOverlays = []
+//    self.overlayView.setNeedsDisplay()
+//
+//    guard !detections.isEmpty else {
+//      return
+//    }
+//
+//    var objectOverlays: [ObjectOverlay] = []
+//    var index = 0
+//    for detection in detections {
+//      index += 1
+//
+//      guard let category = detection.categories.first else { continue }
+//
+//      // Translates bounding box rect to current view.
+//      var viewWidth = overlayView.bounds.size.width
+//      var viewHeight = overlayView.bounds.size.height
+//      var originX: CGFloat = 0
+//      var originY: CGFloat = 0
+//
+//      if viewWidth / viewHeight > imageSize.width / imageSize.height {
+//        viewHeight = imageSize.height / imageSize.width  * overlayView.bounds.size.width
+//        originY = (overlayView.bounds.size.height - viewHeight) / 2
+//      } else {
+//        viewWidth = imageSize.width / imageSize.height * overlayView.bounds.size.height
+//        originX = (overlayView.bounds.size.width - viewWidth) / 2
+//      }
+//      var convertedRect = detection.boundingBox
+//
+//      switch orientation {
+//      case .left:
+//        convertedRect = CGRect(
+//          x: convertedRect.origin.y, y: imageSize.height - convertedRect.origin.x - convertedRect.width, width: convertedRect.height, height: convertedRect.width)
+//      case .right:
+//        convertedRect = CGRect(
+//          x: imageSize.width - convertedRect.origin.y - convertedRect.height, y: convertedRect.origin.x, width: convertedRect.height, height: convertedRect.width)
+//      default:
+//        break
+//      }
+//
+//      convertedRect = convertedRect
+//        .applying(CGAffineTransform(scaleX: viewWidth / imageSize.width, y: viewHeight / imageSize.height))
+//        .applying(CGAffineTransform(translationX: originX, y: originY))
+//
+//      if convertedRect.origin.x < 0 && convertedRect.origin.x + convertedRect.size.width > edgeOffset {
+//        convertedRect.size.width += (convertedRect.origin.x - edgeOffset)
+//        convertedRect.origin.x = edgeOffset
+//      }
+//
+//      if convertedRect.origin.y < 0 && convertedRect.origin.y + convertedRect.size.height > edgeOffset {
+//        convertedRect.size.height += (convertedRect.origin.y - edgeOffset)
+//        convertedRect.origin.y = edgeOffset
+//      }
+//
+//      if convertedRect.maxY > self.overlayView.bounds.maxY {
+//        convertedRect.size.height = self.overlayView.bounds.maxY - convertedRect.origin.y - self.edgeOffset
+//      }
+//
+//      if convertedRect.maxX > self.overlayView.bounds.maxX {
+//        convertedRect.size.width = self.overlayView.bounds.maxX - convertedRect.origin.x - self.edgeOffset
+//      }
+//
+//      // if index = 0 class name is unknow
+//
+//      let confidenceValue = Int(category.score * 100.0)
+//      let string = "\(category.categoryName ?? "Unknow")  (\(confidenceValue)%)"
+//
+//      let displayColor = labelColors[index % labelColors.count]
+//
+//      let size = string.size(withAttributes: [.font: displayFont])
+//
+//      let objectOverlay = ObjectOverlay(name: string, borderRect: convertedRect, nameStringSize: size, color: displayColor, font: self.displayFont)
+//
+//      objectOverlays.append(objectOverlay)
+//    }
+//
+//    // Hands off drawing to the OverlayView
+//    self.draw(objectOverlays: objectOverlays)
+//
+//  }
 
-    self.overlayView.objectOverlays = []
-    self.overlayView.setNeedsDisplay()
-
-    guard !detections.isEmpty else {
-      return
-    }
-
-    var objectOverlays: [ObjectOverlay] = []
-    var index = 0
-    for detection in detections {
-      index += 1
-
-      guard let category = detection.categories.first else { continue }
-
-      // Translates bounding box rect to current view.
-      var viewWidth = overlayView.bounds.size.width
-      var viewHeight = overlayView.bounds.size.height
-      var originX: CGFloat = 0
-      var originY: CGFloat = 0
-
-      if viewWidth / viewHeight > imageSize.width / imageSize.height {
-        viewHeight = imageSize.height / imageSize.width  * overlayView.bounds.size.width
-        originY = (overlayView.bounds.size.height - viewHeight) / 2
-      } else {
-        viewWidth = imageSize.width / imageSize.height * overlayView.bounds.size.height
-        originX = (overlayView.bounds.size.width - viewWidth) / 2
-      }
-      var convertedRect = detection.boundingBox
-
-      switch orientation {
-      case .left:
-        convertedRect = CGRect(
-          x: convertedRect.origin.y, y: imageSize.height - convertedRect.origin.x - convertedRect.width, width: convertedRect.height, height: convertedRect.width)
-      case .right:
-        convertedRect = CGRect(
-          x: imageSize.width - convertedRect.origin.y - convertedRect.height, y: convertedRect.origin.x, width: convertedRect.height, height: convertedRect.width)
-      default:
-        break
-      }
-
-      convertedRect = convertedRect
-        .applying(CGAffineTransform(scaleX: viewWidth / imageSize.width, y: viewHeight / imageSize.height))
-        .applying(CGAffineTransform(translationX: originX, y: originY))
-
-      if convertedRect.origin.x < 0 && convertedRect.origin.x + convertedRect.size.width > edgeOffset {
-        convertedRect.size.width += (convertedRect.origin.x - edgeOffset)
-        convertedRect.origin.x = edgeOffset
-      }
-
-      if convertedRect.origin.y < 0 && convertedRect.origin.y + convertedRect.size.height > edgeOffset {
-        convertedRect.size.height += (convertedRect.origin.y - edgeOffset)
-        convertedRect.origin.y = edgeOffset
-      }
-
-      if convertedRect.maxY > self.overlayView.bounds.maxY {
-        convertedRect.size.height = self.overlayView.bounds.maxY - convertedRect.origin.y - self.edgeOffset
-      }
-
-      if convertedRect.maxX > self.overlayView.bounds.maxX {
-        convertedRect.size.width = self.overlayView.bounds.maxX - convertedRect.origin.x - self.edgeOffset
-      }
-
-      // if index = 0 class name is unknow
-
-      let confidenceValue = Int(category.score * 100.0)
-      let string = "\(category.categoryName ?? "Unknow")  (\(confidenceValue)%)"
-
-      let displayColor = labelColors[index % labelColors.count]
-
-      let size = string.size(withAttributes: [.font: displayFont])
-
-      let objectOverlay = ObjectOverlay(name: string, borderRect: convertedRect, nameStringSize: size, color: displayColor, font: self.displayFont)
-
-      objectOverlays.append(objectOverlay)
-    }
-
-    // Hands off drawing to the OverlayView
-    self.draw(objectOverlays: objectOverlays)
-
-  }
-
-  /** Calls methods to update overlay view with detected bounding boxes and class names.
-   */
-  private func draw(objectOverlays: [ObjectOverlay]) {
-
-    self.overlayView.objectOverlays = objectOverlays
-    self.overlayView.setNeedsDisplay()
-  }
+//  /** Calls methods to update overlay view with detected bounding boxes and class names.
+//   */
+//  private func draw(objectOverlays: [ObjectOverlay]) {
+//
+//    self.overlayView.objectOverlays = objectOverlays
+//    self.overlayView.setNeedsDisplay()
+//  }
 }
 
 
@@ -249,23 +219,33 @@ extension ViewController: InferenceViewControllerDelegate {
     var isModelNeedsRefresh = false
     switch action {
     case .changeScoreThreshold(let scoreThreshold):
-      if self.scoreThreshold != scoreThreshold {
-        isModelNeedsRefresh = true
-      }
-      self.scoreThreshold = scoreThreshold
+      DetectorMetaData.sharedInstance.scoreThreshold = scoreThreshold
     case .changeMaxResults(let maxResults):
       if self.maxResults != maxResults {
         isModelNeedsRefresh = true
       }
-      self.maxResults = maxResults
+      DetectorMetaData.sharedInstance.maxResults = maxResults
     case .changeModel(let model):
       if self.model != model {
         isModelNeedsRefresh = true
       }
-      self.model = model
+      DetectorMetaData.sharedInstance.model = model
     default:
       break
     }
+    
+//    guard let tabBarItems = runningModeTabbar.items, tabBarItems.count == 2 else {
+//      return
+//    }
+//    switch runningModeTabbar.selectedItem {
+//    case tabBarItems[0]:
+//      cameraViewController?.objectDetectorService(<#T##objectDetectorService: ObjectDetectorService##ObjectDetectorService#>, didFinishDetection: <#T##ResultBundle?#>, error: <#T##Error?#>)
+//      break
+//    case tabBarItems[1]:
+//      mediaLibraryViewController?.orientationChanged(deviceOrientation: UIDevice.current.orientation)
+//    default:
+//      break
+//    }
   }
   
   func viewController(_ viewController: InferenceViewController, didSwitchBottomSheetViewState isOpen: Bool) {
@@ -329,6 +309,7 @@ extension ViewController: UITabBarDelegate {
         guard let viewController = UIStoryboard(name: "Main", bundle: .main).instantiateViewController(withIdentifier: "MEDIA_LIBRARY_VIEW_CONTROLLER") as? MediaLibraryViewController else {
           return
         }
+        viewController.interfaceUpdatesDelegate = self
         mediaLibraryViewController = viewController
       }
         
@@ -337,8 +318,6 @@ extension ViewController: UITabBarDelegate {
     default:
       break
     }
-    overlayView.objectOverlays = []
-    overlayView.setNeedsDisplay()
   }
 }
 

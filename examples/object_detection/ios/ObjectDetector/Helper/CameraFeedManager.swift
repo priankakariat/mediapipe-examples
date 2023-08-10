@@ -73,22 +73,41 @@ class CameraFeedManager: NSObject {
   private lazy var videoDataOutput = AVCaptureVideoDataOutput()
   private var isSessionRunning = false
   private var coreImageContext: CIContext
-  private var needCalculationSize = true
   private let cameraPosition: AVCaptureDevice.Position = .back
 
-  var orientation: UIImage.Orientation {
+//  var orientation: UIImage.Orientation {
+//    get {
+//      switch UIDevice.current.orientation {
+//      case .landscapeLeft:
+//          return .left
+//      case .landscapeRight:
+//          return .right
+//      default:
+//          return .up
+//      }
+//    }
+//  }
+  private var imageBufferSize: CGSize?
+  var videoResolution: CGSize {
     get {
+      guard let size = imageBufferSize else {
+        return CGSize.zero
+      }
+      
+      let minDimension = min(size.width, size.height)
+      let maxDimension = max(size.width, size.height)
       switch UIDevice.current.orientation {
+      case .portrait:
+        return CGSize(width: minDimension, height: maxDimension)
       case .landscapeLeft:
-          return .left
+        fallthrough
       case .landscapeRight:
-          return .right
+        return CGSize(width: maxDimension, height: minDimension)
       default:
-          return .up
+        return CGSize(width: minDimension, height: maxDimension)
       }
     }
   }
-  var videoFrameSize: CGSize = .zero
 
   // MARK: CameraFeedManagerDelegate
   weak var delegate: CameraFeedManagerDelegate?
@@ -118,8 +137,7 @@ class CameraFeedManager: NSObject {
 
   // MARK: notification methods
   @objc func orientationChanged(notification: Notification) {
-    needCalculationSize = true
-    switch orientation {
+    switch UIImage.Orientation.from(deviceOrientation: UIDevice.current.orientation) {
     case .up:
       previewView.previewLayer.connection?.videoOrientation = .portrait
     case .left:
@@ -377,16 +395,10 @@ extension CameraFeedManager: AVCaptureVideoDataOutputSampleBufferDelegate {
   /** This method delegates the CVPixelBuffer of the frame seen by the camera currently.
    */
   func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-    if needCalculationSize {
       let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer)!
-      switch orientation {
-      case .left, .right:
-        videoFrameSize = CGSize(width: CVPixelBufferGetHeight(imageBuffer), height: CVPixelBufferGetWidth(imageBuffer))
-      default:
-        videoFrameSize = CGSize(width: CVPixelBufferGetWidth(imageBuffer), height: CVPixelBufferGetHeight(imageBuffer))
+      if (imageBufferSize == nil) {
+        imageBufferSize = CGSize(width: CVPixelBufferGetHeight(imageBuffer), height: CVPixelBufferGetWidth(imageBuffer))
       }
-      needCalculationSize = false
-    }
-    delegate?.didOutput(sampleBuffer: sampleBuffer, orientation: orientation)
+    delegate?.didOutput(sampleBuffer: sampleBuffer, orientation: UIImage.Orientation.from(deviceOrientation: UIDevice.current.orientation))
   }
 }

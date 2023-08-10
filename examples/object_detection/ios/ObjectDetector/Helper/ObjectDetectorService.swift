@@ -36,7 +36,7 @@ class ObjectDetectorService: NSObject {
   weak var videoDelegate: ObjectDetectorServiceVideoDelegate?
 
   var objectDetector: ObjectDetector?
-  private var runningMode = RunningMode.image
+  private(set) var runningMode = RunningMode.image
   private var maxResults = 3
   private var scoreThreshold: Float = 0.5
   var modelPath: String
@@ -61,7 +61,7 @@ class ObjectDetectorService: NSObject {
   }
   
   static func liveStreamDetectorService(model: Model, maxResults: Int, scoreThreshold: Float, liveStreamDelegate: ObjectDetectorServiceLiveStreamDelegate?) -> ObjectDetectorService? {
-    let objectDetectorService = ObjectDetectorService(model: model, maxResults: maxResults, scoreThreshold: scoreThreshold, runningMode: .video)
+    let objectDetectorService = ObjectDetectorService(model: model, maxResults: maxResults, scoreThreshold: scoreThreshold, runningMode: .liveStream)
     objectDetectorService?.liveStreamDelegate = liveStreamDelegate
     return objectDetectorService
   }
@@ -116,7 +116,7 @@ class ObjectDetectorService: NSObject {
   }
 
   func detectAsync(videoFrame: CMSampleBuffer, orientation: UIImage.Orientation, timeStamps: Int) {
-    guard let objectDetector = objectDetector(runningMode:.video), let image = try? MPImage(sampleBuffer: videoFrame, orientation: orientation) else {
+    guard let objectDetector = objectDetector(runningMode:.liveStream), let image = try? MPImage(sampleBuffer: videoFrame, orientation: orientation) else {
       return
     }
       do {
@@ -149,7 +149,8 @@ class ObjectDetectorService: NSObject {
       let timestampMs = Int(inferenceIntervalMs) * i // ms
       let image: CGImage?
       do {
-        let time = CMTime(seconds: Double(timestampMs) / 1000, preferredTimescale: 600)
+        let time = CMTime(value: Int64(timestampMs), timescale: 1000)
+//        CMTime(seconds: Double(timestampMs) / 1000, preferredTimescale: 1000)
         image = try generator.copyCGImage(at: time, actualTime:nil)
         
       } catch {
@@ -176,6 +177,7 @@ class ObjectDetectorService: NSObject {
       }
     }
     let inferenceTime = Date().timeIntervalSince(startDate) / Double(frameCount) * 1000
+
     return ResultBundle(inferenceTime: inferenceTime, objectDetectorResults: objectDetectorResults, size: videoSize)
   }
   

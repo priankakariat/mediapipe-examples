@@ -7,6 +7,7 @@
 
 import UIKit
 import CoreMedia
+import MediaPipeTasksVision
 
 protocol InferenceResultDeliveryDelegate: AnyObject {
   func didPerformInference(result: ResultBundle?)
@@ -17,6 +18,10 @@ protocol InferenceResultDeliveryDelegate: AnyObject {
 }
 
 class CameraViewController: UIViewController {
+  
+  private struct Constants {
+    static let edgeOffset: CGFloat = 2.0
+  }
   
   @IBOutlet var previewView: PreviewView!
   @IBOutlet weak var cameraUnavailableLabel: UILabel!
@@ -29,7 +34,24 @@ class CameraViewController: UIViewController {
   // MARK: Controllers that manage functionality
   // Handles all the camera related functionality
   private lazy var cameraCapture = CameraFeedManager(previewView: previewView)
-  private var objectDetectorService: ObjectDetectorService?
+  
+  private let objectDetectorServiceQueue = DispatchQueue(
+    label: "objectDetectorServiceQueue",
+    attributes: .concurrent)
+  
+  private var _objectDetectorService: ObjectDetectorService?
+  private var objectDetectorService: ObjectDetectorService? {
+    get {
+      objectDetectorServiceQueue.sync {
+        return self._objectDetectorService
+      }
+    }
+    set {
+      objectDetectorServiceQueue.async(flags: .barrier) {
+        self._objectDetectorService = newValue
+      }
+    }
+  }
   
   weak var inferenceResultDeliveryDelegate: InferenceResultDeliveryDelegate?
   weak var interfaceUpdatesDelegate: InterfaceUpdatesDelegate?
@@ -53,6 +75,7 @@ class CameraViewController: UIViewController {
   
   override func viewDidLoad() {
     super.viewDidLoad()
+    cameraCapture.delegate = self
     #if !targetEnvironment(simulator)
       objectDetectorService = ObjectDetectorService.liveStreamDetectorService(model: DetectorMetaData.sharedInstance.model, maxResults: DetectorMetaData.sharedInstance.maxResults, scoreThreshold: DetectorMetaData.sharedInstance.scoreThreshold, liveStreamDelegate: self)
     #endif
@@ -152,19 +175,41 @@ class CameraViewController: UIViewController {
   // MARK: ObjectDetectorHelperDelegate
   extension CameraViewController: ObjectDetectorServiceLiveStreamDelegate {
     func objectDetectorService(_ objectDetectorService: ObjectDetectorService, didFinishDetection result: ResultBundle?, error: Error?) {
-      DispatchQueue.main.async {
-          self.inferenceResultDeliveryDelegate?.didPerformInference(result: result)
-        if let objectDetectorResult = result?.objectDetectorResults.first {
-          overlayView.draw(
-            objectOverlays: [ObjectOverlay],
-            inBoundsOfContentImageOfSize: <#T##CGSize#>,
-            imageContentMode: <#T##UIView.ContentMode#>)
-          ObjectOverlayHelper.objectOverlays(
-            fromDetections: objectDetectorResult?.detections,
-            inferredOnImageOfSize: <#T##CGSize#>,
-            andOrientation: cameraCapture.orientation)
+      DispatchQueue.main.async { [weak self] in
+        guard let weakSelf = self else {
+          return
+        }
+        weakSelf.inferenceResultDeliveryDelegate?.didPerformInference(result: result)
+        if let objectDetectorResult = result?.objectDetectorResults.first as? ObjectDetectorResult {
+          let imageSize = weakSelf.cameraCapture.videoResolution
+          let objectOverlays = ObjectOverlayHelper.objectOverlays(
+            fromDetections: objectDetectorResult.detections,
+            inferredOnImageOfSize: imageSize,
+            andOrientation: UIImage.Orientation.from(deviceOrientation: UIDevice.current.orientation))
+          
+          weakSelf.overlayView.draw(
+            objectOverlays: objectOverlays,
+            inBoundsOfContentImageOfSize: imageSize,
+            edgeOffset: Constants.edgeOffset,
+            imageContentMode: .scaleAspectFill)
+         
         }
       }
     }
   }
+
+extension UIImage.Orientation {
+  static func from(deviceOrientation: UIDeviceOrientation) -> UIImage.Orientation {
+    switch deviceOrientation {
+    case .portrait:
+      return .up
+    case .landscapeLeft:
+      return .left
+    case .landscapeRight:
+      return .right
+    default:
+      return .up
+    }
+  }
+}
 

@@ -11,13 +11,7 @@ import AVKit
 import MediaPipeTasksVision
 
 class MediaLibraryViewController: UIViewController {
-  
-  private struct Constants {
-    static let inferenceTimeIntervalMs: Int64 = 300
-    static let kMilliSeconds: Int32 = 1000
-    static let savedPhotosNotAvailableText = "Saved photos album is not available."
-    static let pickFromGalleryButtonInset: CGFloat = 20.0
-  }
+  weak var interfaceUpdatesDelegate: InterfaceUpdatesDelegate?
 
   @IBOutlet weak var progressView: UIProgressView!
   @IBOutlet weak var imageEmptyLabel: UILabel!
@@ -26,9 +20,15 @@ class MediaLibraryViewController: UIViewController {
   @IBOutlet weak var pickFromGalleryButton: UIButton!
   @IBOutlet weak var pickFromGalleryButtonBottomSpace: NSLayoutConstraint!
   
+  private struct Constants {
+    static let inferenceTimeIntervalMs: Int64 = 1
+    static let kMilliSeconds: Int64 = 1000
+    static let savedPhotosNotAvailableText = "Saved photos album is not available."
+    static let pickFromGalleryButtonInset: CGFloat = 20.0
+  }
+  
   private lazy var pickerController = UIImagePickerController()
   private var playerViewController: AVPlayerViewController?
-    
   private var objectDetectorService: ObjectDetectorService?
     
   override func viewDidLoad() {
@@ -81,7 +81,7 @@ class MediaLibraryViewController: UIViewController {
   }
   
   func showProgressView() {
-    progressView.superview?.isHidden = false
+    progressView.superview?.superview?.isHidden = false
     progressView.progress = 0.0
     progressView.observedProgress = nil
   }
@@ -91,17 +91,25 @@ class MediaLibraryViewController: UIViewController {
   }
   
   func orientationChanged(deviceOrientation: UIDeviceOrientation) {
-    overlayView.redrawObjectOverlays(forNewDeviceOrientation: deviceOrientation)
+    guard let objectDetectorService = objectDetectorService else {
+      return
+    }
+    if objectDetectorService.runningMode == .image {
+      overlayView
+        .redrawObjectOverlays(
+          forNewDeviceOrientation: deviceOrientation)
+    }
   }
   
   func layoutUIElements(withInferenceViewHeight height: CGFloat) {
-    pickFromGalleryButtonBottomSpace.constant = height + Constants.pickFromGalleryButtonInset
+    pickFromGalleryButtonBottomSpace.constant =
+      height + Constants.pickFromGalleryButtonInset
     view.layoutSubviews()
-    
   }
 }
 
-extension MediaLibraryViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+extension MediaLibraryViewController: UIImagePickerControllerDelegate,
+                                      UINavigationControllerDelegate {
   
   private func draw(
     detections: [Detection],
@@ -168,7 +176,7 @@ extension MediaLibraryViewController: UIImagePickerControllerDelegate, UINavigat
   }
   
   @objc func playerDidFinishPlaying(notification: NSNotification) {
-    
+    interfaceUpdatesDelegate?.shouldClicksBeEnabled(true)
   }
   
   func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
@@ -176,19 +184,33 @@ extension MediaLibraryViewController: UIImagePickerControllerDelegate, UINavigat
   }
   
   func clearAndInitializeObjectDetectorService(runningMode: RunningMode) {
-    objectDetectorService = nil
-    
     switch runningMode {
       case .image:
-        objectDetectorService = ObjectDetectorService.stillImageDetectorService(model: DefaultConstants.model, maxResults: DefaultConstants.maxResults, scoreThreshold: DefaultConstants.scoreThreshold)
+        guard runningMode != .image else {
+          return
+        }
+        objectDetectorService = nil
+        objectDetectorService = ObjectDetectorService
+          .stillImageDetectorService(
+            model: DefaultConstants.model,
+            maxResults: DefaultConstants.maxResults,
+            scoreThreshold: DefaultConstants.scoreThreshold)
       case .video:
-        objectDetectorService = ObjectDetectorService.videoObjectDetectorService(model: DetectorMetaData.sharedInstance.model, maxResults: DetectorMetaData.sharedInstance.maxResults, scoreThreshold: DetectorMetaData.sharedInstance.scoreThreshold, videoDelegate: self)
+        objectDetectorService = nil
+        objectDetectorService = ObjectDetectorService
+          .videoObjectDetectorService(
+            model: DetectorMetaData.sharedInstance.model,
+            maxResults: DetectorMetaData.sharedInstance.maxResults,
+            scoreThreshold: DetectorMetaData.sharedInstance.scoreThreshold,
+            videoDelegate: self)
       default:
         break;
     }
   }
   
-  func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+  func imagePickerController(
+    _ picker: UIImagePickerController,
+    didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
     picker.dismiss(animated: true)
     
     guard let mediaType = info[.mediaType] as? String else {
@@ -200,21 +222,31 @@ extension MediaLibraryViewController: UIImagePickerControllerDelegate, UINavigat
       guard let mediaURL = info[.mediaURL] as? URL else {
         return
       }
-      clearAndInitializeObjectDetectorService(runningMode: .video)
       overlayView.clear()
+
+      clearAndInitializeObjectDetectorService(runningMode: .video)
+
       let asset = AVAsset(url: mediaURL)
       Task {
+        interfaceUpdatesDelegate?.shouldClicksBeEnabled(false)
         showProgressView()
-        let resultBundle = await objectDetectorService?.detect(videoAsset:asset, inferenceIntervalMs: Double(Constants.inferenceTimeIntervalMs))
+        let resultBundle = await self.objectDetectorService?.detect(videoAsset:asset, inferenceIntervalMs: Double(Constants.inferenceTimeIntervalMs))
         hideProgressView()
         
         playVideo(asset: AVAsset(url: mediaURL))
         
-        playerViewController?.player?.addPeriodicTimeObserver(forInterval: CMTime(value: Constants.inferenceTimeIntervalMs, timescale: Constants.kMilliSeconds), queue: DispatchQueue(label: "timeObserverQueue"), using: { [weak self] (time: CMTime) in
+        playerViewController?.player?.addPeriodicTimeObserver(forInterval: CMTime(value: Constants.inferenceTimeIntervalMs, timescale: Int32(Constants.kMilliSeconds)), queue: DispatchQueue(label: "timeObserverQueue"), using: { [weak self] (time: CMTime) in
           DispatchQueue.main.async {
-            let index =  Int(time.value / Constants.inferenceTimeIntervalMs)
-            if let resultBundle = resultBundle, index < resultBundle.objectDetectorResults.count, let objectDetectorResult = resultBundle.objectDetectorResults[index], let bounds = self?.playerViewController?.videoBounds {
-              self?.draw(detections: objectDetectorResult.detections, originalImageSize: resultBundle.size, andOrientation: .up, inFrame: bounds)
+            let index = Int(CMTimeGetSeconds(time) * Double(Constants.kMilliSeconds) / Double(Constants.inferenceTimeIntervalMs))
+            if let resultBundle = resultBundle,
+               index < resultBundle.objectDetectorResults.count,
+               let objectDetectorResult = resultBundle.objectDetectorResults[index],
+               let bounds = self?.playerViewController?.videoBounds {
+              self?.draw(
+                detections: objectDetectorResult.detections,
+                originalImageSize: resultBundle.size,
+                andOrientation: .up,
+                inFrame: bounds)
             }
           }
         })
@@ -225,19 +257,24 @@ extension MediaLibraryViewController: UIImagePickerControllerDelegate, UINavigat
     case UTType.image.identifier:
       removePlayerViewController()
       overlayView.clear()
+      
       guard let image = info[.originalImage] as? UIImage else {
         pickedImageView.image = nil
         return
       }
       pickedImageView.image = image
-      print(image.imageOrientation.rawValue)
+      
+      interfaceUpdatesDelegate?.shouldClicksBeEnabled(false)
       showProgressView()
+      
       clearAndInitializeObjectDetectorService(runningMode: .image)
+      
       DispatchQueue.global(qos: .userInteractive).async { [weak self] in
         if let weakSelf = self, let objectDetectorResult = weakSelf.objectDetectorService?.detect(image: image)?.objectDetectorResults.first as? ObjectDetectorResult {
           DispatchQueue.main.async {
             weakSelf.hideProgressView()
             weakSelf.draw(detections: objectDetectorResult.detections, originalImageSize: image.size, andOrientation: image.imageOrientation, inFrame: weakSelf.overlayView.bounds)
+            weakSelf.interfaceUpdatesDelegate?.shouldClicksBeEnabled(true)
           }
         }
       }
@@ -250,11 +287,15 @@ extension MediaLibraryViewController: UIImagePickerControllerDelegate, UINavigat
 
 extension MediaLibraryViewController: ObjectDetectorServiceVideoDelegate {
   
-  func objectDetectorService(_ objectDetectorService: ObjectDetectorService, didFinishDetectionOnVideoFrame index: Int) {
+  func objectDetectorService(
+    _ objectDetectorService: ObjectDetectorService,
+    didFinishDetectionOnVideoFrame index: Int) {
     progressView.observedProgress?.completedUnitCount = Int64(index + 1)
   }
   
-  func objectDetectorService(_ objectDetectorService: ObjectDetectorService, willBeginDetection totalframeCount: Int) {
+  func objectDetectorService(
+    _ objectDetectorService: ObjectDetectorService,
+    willBeginDetection totalframeCount: Int) {
     progressView.observedProgress = Progress(totalUnitCount: Int64(totalframeCount))
   }
 }

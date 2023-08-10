@@ -51,6 +51,7 @@ class OverlayView: UIView {
     edgeOffset: CGFloat = 0.0,
     imageContentMode: UIView.ContentMode) {
     
+    self.clear()
     contentImageSize = imageSize
     self.edgeOffset = edgeOffset
     self.objectOverlays = objectOverlays

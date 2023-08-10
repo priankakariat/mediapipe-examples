@@ -21,24 +21,6 @@ import AVFoundation
  */
 class PreviewView: UIView {
 
-
-  lazy private var imageView: UIImageView = {
-    let imageView = UIImageView()
-    imageView.backgroundColor = .black
-    imageView.contentMode = .scaleAspectFill
-    imageView.translatesAutoresizingMaskIntoConstraints = false
-    return imageView
-  }()
-
-  var image: UIImage? {
-    get {
-      return imageView.image
-    }
-    set {
-      imageView.image = newValue
-    }
-  }
-
   var previewLayer: AVCaptureVideoPreviewLayer {
     guard let layer = layer as? AVCaptureVideoPreviewLayer else {
       fatalError("Layer expected is of type VideoPreviewLayer")
