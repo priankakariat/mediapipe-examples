@@ -21,38 +21,6 @@ import AVFoundation
  */
 class PreviewView: UIView {
 
-  var shouldUseClipboardImage: Bool = false {
-    didSet {
-      if shouldUseClipboardImage {
-        if imageView.superview == nil {
-          addSubview(imageView)
-          let constraints = [
-            NSLayoutConstraint(item: imageView, attribute: .top,
-                               relatedBy: .equal,
-                               toItem: self, attribute: .top,
-                               multiplier: 1, constant: 0),
-            NSLayoutConstraint(item: imageView, attribute: .leading,
-                               relatedBy: .equal,
-                               toItem: self, attribute: .leading,
-                               multiplier: 1, constant: 0),
-            NSLayoutConstraint(item: imageView, attribute: .trailing,
-                               relatedBy: .equal,
-                               toItem: self, attribute: .trailing,
-                               multiplier: 1, constant: 0),
-            NSLayoutConstraint(item: imageView, attribute: .bottom,
-                               relatedBy: .equal,
-                               toItem: self, attribute: .bottom,
-                               multiplier: 1, constant: 0),
-          ]
-          addConstraints(constraints)
-        }
-
-      } else {
-        imageView.removeFromSuperview()
-        imageView.image = nil
-      }
-    }
-  }
 
   lazy private var imageView: UIImageView = {
     let imageView = UIImageView()

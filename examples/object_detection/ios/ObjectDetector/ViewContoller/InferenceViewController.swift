@@ -23,6 +23,10 @@ protocol InferenceViewControllerDelegate {
   func viewController(
     _ viewController: InferenceViewController,
     needPerformActions action: InferenceViewController.Action)
+  
+  func viewController(
+    _ viewController: InferenceViewController,
+    didSwitchBottomSheetViewState isOpen: Bool)
 }
 
 class InferenceViewController: UIViewController {
@@ -49,15 +53,21 @@ class InferenceViewController: UIViewController {
   @IBOutlet weak var maxResultLabel: UILabel!
 
   // MARK: Instance Variables
-  var result: ResultBundle? = nil
   var maxResults = DefaultConstants.maxResults
   var scoreThreshold = DefaultConstants.scoreThreshold
   var modelChose = DefaultConstants.model
+  var isUIEnabled: Bool = false {
+    didSet {
+      enableOrDisableClicks()
+    }
+  }
+  
   private var resultIndex = 0
 
   override func viewDidLoad() {
     super.viewDidLoad()
     setupUI()
+    enableOrDisableClicks()
   }
 
   // Private function
@@ -91,10 +101,14 @@ class InferenceViewController: UIViewController {
   }
 
   // Public function
-  func updateData() {
-    if let inferenceTime = result?.inferenceTime {
-      infrenceTimeLabel.text = String(format: "%.2fms", inferenceTime)
-    }
+  func update(inferenceTimeString: String) {
+    infrenceTimeLabel.text = inferenceTimeString
+  }
+  
+  private func enableOrDisableClicks() {
+    choseModelButton.isEnabled = isUIEnabled
+    maxResultStepper.isEnabled = isUIEnabled
+    thresholdStepper.isEnabled = isUIEnabled
   }
 
   // MARK: IBAction
@@ -103,7 +117,7 @@ class InferenceViewController: UIViewController {
     sender.isSelected.toggle()
     infrenceTimeLabel.isHidden = !sender.isSelected
     infrenceTimeTitleLabel.isHidden = !sender.isSelected
-    delegate?.viewController(self, needPerformActions: .changeBottomSheetViewBottomSpace(sender.isSelected))
+    delegate?.viewController(self, didSwitchBottomSheetViewState: sender.isSelected)
   }
 
   @IBAction func thresholdStepperValueChanged(_ sender: UIStepper) {

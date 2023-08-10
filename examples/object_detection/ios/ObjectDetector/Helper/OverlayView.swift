@@ -29,62 +29,183 @@ struct ObjectOverlay {
  This UIView draws overlay on a detected object.
  */
 class OverlayView: UIView {
-
-  var objectOverlays: [ObjectOverlay] = []
+  
+  private var objectOverlays: [ObjectOverlay] = []
+  
   private let cornerRadius: CGFloat = 10.0
-  private let stringBgAlpha: CGFloat
-    = 0.7
+  private let stringBgAlpha: CGFloat = 0.7
   private let lineWidth: CGFloat = 3
   private let stringFontColor = UIColor.white
   private let stringHorizontalSpacing: CGFloat = 13.0
   private let stringVerticalSpacing: CGFloat = 7.0
+  
+  private var contentImageSize: CGSize = CGSizeZero
+  private var imageContentMode: UIView.ContentMode = .scaleAspectFit
+  private var orientation = UIDeviceOrientation.portrait
 
+  private var edgeOffset: CGFloat = 0.0
+  
+  func draw(
+    objectOverlays: [ObjectOverlay],
+    inBoundsOfContentImageOfSize imageSize: CGSize,
+    edgeOffset: CGFloat = 0.0,
+    imageContentMode: UIView.ContentMode) {
+    
+    contentImageSize = imageSize
+    self.edgeOffset = edgeOffset
+    self.objectOverlays = objectOverlays
+    self.imageContentMode = imageContentMode
+    orientation = UIDevice.current.orientation
+    self.setNeedsDisplay()
+  }
+  
   override func draw(_ rect: CGRect) {
-
     // Drawing code
     for objectOverlay in objectOverlays {
-
-      drawBorders(of: objectOverlay)
-      drawBackground(of: objectOverlay)
-      drawName(of: objectOverlay)
+      
+      let readjustedBorderRect = rectAfterApplyingBoundsAdjustment(
+        onOverlayBorderRect: objectOverlay.borderRect)
+      draw(
+        borderWithRect: readjustedBorderRect,
+        color: objectOverlay.color)
+      draw(
+        name: objectOverlay.name,
+        withBorderRect: readjustedBorderRect,
+        color: objectOverlay.color,
+        nameStringSize: objectOverlay.nameStringSize,
+        font: objectOverlay.font)
     }
   }
-
+  
+  private func rectAfterApplyingBoundsAdjustment(
+    onOverlayBorderRect borderRect: CGRect) -> CGRect {
+    
+    var currentSize = self.bounds.size
+    let minDimension = min(self.bounds.size.width, self.bounds.size.height)
+    let maxDimension = max(self.bounds.size.width, self.bounds.size.height)
+      
+    switch orientation {
+    case .portrait:
+      currentSize = CGSizeMake(minDimension, maxDimension)
+    case .landscapeLeft:
+      fallthrough
+    case .landscapeRight:
+      currentSize = CGSizeMake(maxDimension, minDimension)
+    default:
+      break
+    }
+    
+    let offsetsAndScaleFactor = ObjectOverlayHelper.offsetsAndScaleFactor(forImageOfSize: self.contentImageSize, tobeDrawnInViewOfSize: currentSize, withContentMode: imageContentMode)
+    
+    var newRect = borderRect
+        .applying(
+          CGAffineTransform(scaleX: offsetsAndScaleFactor.scaleFactor, y: offsetsAndScaleFactor.scaleFactor)
+        )
+      .applying(
+        CGAffineTransform(translationX: offsetsAndScaleFactor.xOffset, y: offsetsAndScaleFactor.yOffset)
+      )
+    
+    if newRect.origin.x < 0 &&
+       newRect.origin.x + newRect.size.width > edgeOffset {
+      newRect.size.width = newRect.maxX - edgeOffset
+      newRect.origin.x = edgeOffset
+    }
+    
+    if newRect.origin.y < 0 &&
+      newRect.origin.y + newRect.size.height > edgeOffset {
+      newRect.size.height += newRect.maxY - edgeOffset
+      newRect.origin.y = edgeOffset
+    }
+    
+    if newRect.maxY > currentSize.height {
+      newRect.size.height = currentSize.height - newRect.origin.y  - edgeOffset
+    }
+    
+    if newRect.maxX > currentSize.width {
+      newRect.size.width = currentSize.width - newRect.origin.x - edgeOffset
+    }
+    
+    return newRect
+    
+  }
+  
   /**
    This method draws the borders of the detected objects.
    */
-  func drawBorders(of objectOverlay: ObjectOverlay) {
-
-    let path = UIBezierPath(rect: objectOverlay.borderRect)
+  private func draw(borderWithRect rect: CGRect, color: UIColor) {
+    
+    
+    let path = UIBezierPath(rect: rect)
     path.lineWidth = lineWidth
-    objectOverlay.color.setStroke()
-
+    color.setStroke()
+    
     path.stroke()
   }
-
+  
   /**
-   This method draws the background of the string.
+   This method draws the name  and background with the specified params.
    */
-  func drawBackground(of objectOverlay: ObjectOverlay) {
-
-    let stringBgRect = CGRect(x: objectOverlay.borderRect.origin.x, y: objectOverlay.borderRect.origin.y , width: 2 * stringHorizontalSpacing + objectOverlay.nameStringSize.width, height: 2 * stringVerticalSpacing + objectOverlay.nameStringSize.height
+  private func draw(
+    name: String,
+    withBorderRect borderRect: CGRect,
+    color: UIColor,
+    nameStringSize: CGSize,
+    font: UIFont) {
+      
+    // Draws the background of the name.
+    let stringBgRect = CGRect(
+      x: borderRect.origin.x,
+      y: borderRect.origin.y ,
+      width: 2 * stringHorizontalSpacing + nameStringSize.width,
+      height: 2 * stringVerticalSpacing + nameStringSize.height
     )
-
+      
     let stringBgPath = UIBezierPath(rect: stringBgRect)
-    objectOverlay.color.withAlphaComponent(stringBgAlpha).setFill()
+    color.withAlphaComponent(stringBgAlpha)
+        .setFill()
     stringBgPath.fill()
-  }
-
-  /**
-   This method draws the name of object overlay.
-   */
-  func drawName(of objectOverlay: ObjectOverlay) {
-
-    // Draws the string.
-    let stringRect = CGRect(x: objectOverlay.borderRect.origin.x + stringHorizontalSpacing, y: objectOverlay.borderRect.origin.y + stringVerticalSpacing, width: objectOverlay.nameStringSize.width, height: objectOverlay.nameStringSize.height)
-
-    let attributedString = NSAttributedString(string: objectOverlay.name, attributes: [NSAttributedString.Key.foregroundColor : stringFontColor, NSAttributedString.Key.font : objectOverlay.font])
+    
+    // Draws the name.
+    let stringRect = CGRect(
+      x: borderRect.origin.x + stringHorizontalSpacing,
+      y: borderRect.origin.y + stringVerticalSpacing,
+      width: nameStringSize.width,
+      height: nameStringSize.height)
+    
+    let attributedString = NSAttributedString(
+      string: name,
+      attributes: [
+        NSAttributedString.Key.foregroundColor : stringFontColor,
+        NSAttributedString.Key.font : font
+      ])
+      
     attributedString.draw(in: stringRect)
   }
-
+  
+  func redrawObjectOverlays(forNewDeviceOrientation deviceOrientation:UIDeviceOrientation) {
+    
+        orientation = deviceOrientation
+      
+        switch orientation {
+        case .portrait:
+          fallthrough
+        case .landscapeLeft:
+          fallthrough
+        case .landscapeRight:
+          self.setNeedsDisplay()
+        default:
+          return
+        }
+  }
+  
+  func clear() {
+    objectOverlays = []
+    contentImageSize = CGSize.zero
+    imageContentMode = .scaleAspectFit
+    orientation = UIDevice.current.orientation
+    edgeOffset = 0.0
+    
+    setNeedsLayout()
+  }
+  
 }

@@ -1,20 +1,20 @@
 PODS:
-  - MediaPipeTasksCommon (0.10.2-alpha-3)
-  - MediaPipeTasksVision (0.10.2-alpha-3):
-    - MediaPipeTasksCommon (= 0.10.2-alpha-3)
+  - MediaPipeTasksCommon (7.0.0)
+  - MediaPipeTasksVision (7.0.0):
+    - MediaPipeTasksCommon (= 7.0.0)
 
 DEPENDENCIES:
-  - MediaPipeTasksVision (= 0.10.2-alpha-3)
+  - MediaPipeTasksVision (= 7.0.0)
 
 SPEC REPOS:
-  trunk:
+  https://github.com/priankakariatyml/mpp-task-pod-test.git:
     - MediaPipeTasksCommon
     - MediaPipeTasksVision
 
 SPEC CHECKSUMS:
-  MediaPipeTasksCommon: d2cb34b690555550a9576caa9ea16b6aaa55a6e9
-  MediaPipeTasksVision: a60e150bdc7c0d8dda1e071a88228da7dbd526a4
+  MediaPipeTasksCommon: 0a933004720b9b02c0a75966e9a1433d34904d6b
+  MediaPipeTasksVision: 89fc7d6743e6172134e81fc39a3290e9be10d94a
 
-PODFILE CHECKSUM: cc941ee90671810267de35b8a36d57abaa57e9e0
+PODFILE CHECKSUM: b2c6dbd13f14669e54c9e15c9bf413adb1ae38da
 
 COCOAPODS: 1.12.1

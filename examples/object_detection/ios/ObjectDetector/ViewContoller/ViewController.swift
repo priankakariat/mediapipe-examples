@@ -20,18 +20,12 @@ import AVKit
 class ViewController: UIViewController {
 
   // MARK: Storyboards Connections
-  @IBOutlet weak var previewView: PreviewView!
+  @IBOutlet weak var tabBarContainerView: UIView!
   @IBOutlet weak var overlayView: OverlayView!
-  @IBOutlet weak var addImageButton: UIButton!
-  @IBOutlet weak var cameraUnavailableLabel: UILabel!
-  @IBOutlet weak var imageEmptyLabel: UILabel!
-  @IBOutlet weak var resumeButton: UIButton!
   @IBOutlet weak var runningModeTabbar: UITabBar!
-  @IBOutlet weak var cameraTabbarItem: UITabBarItem!
-  @IBOutlet weak var photoTabbarItem: UITabBarItem!
   @IBOutlet weak var bottomSheetViewBottomSpace: NSLayoutConstraint!
   @IBOutlet weak var bottomViewHeightConstraint: NSLayoutConstraint!
-
+  
   // MARK: Constants
   private let inferenceIntervalMs: Double = 100
   private let inferenceBottomHeight = 220.0
@@ -53,70 +47,86 @@ class ViewController: UIViewController {
   ]
   private let playerViewController = AVPlayerViewController()
   private var generator:AVAssetImageGenerator?
-
-  // MARK: Instance Variables
-  private var videoDetectTimer: Timer?
-  private var previousInferenceTimeMs = Date.distantPast.timeIntervalSince1970 * 1000
-  private var maxResults = DefaultConstants.maxResults
-  private var scoreThreshold = DefaultConstants.scoreThreshold
-  private var model = DefaultConstants.model
-  private var runningMode: RunningMode = .liveStream {
-    didSet {
-      objectDetectorHelper = ObjectDetectorHelper(
-        model: model,
-        maxResults: maxResults,
-        scoreThreshold: scoreThreshold,
-        runningMode: runningMode,
-        delegate: self
-      )
+  var orientation: UIImage.Orientation {
+    get {
+      switch UIDevice.current.orientation {
+      case .landscapeLeft:
+        return .left
+      case .landscapeRight:
+        return .right
+      default:
+        return .up
+      }
     }
   }
 
-  let backgroundQueue = DispatchQueue(
-      label: "com.google.mediapipe.ObjectDetection",
-      qos: .userInteractive
-    )
+  // MARK: Instance Variables
+//  private var videoDetectTimer: Timer?
+//  private var previousInferenceTimeMs = Date.distantPast.timeIntervalSince1970 * 1000
+  private var maxResults = DefaultConstants.maxResults
+  private var scoreThreshold = DefaultConstants.scoreThreshold
+  private var model = DefaultConstants.model
+  private var runningMode: RunningMode = .liveStream
+
+//  let backgroundQueue = DispatchQueue(
+//      label: "com.google.mediapipe.ObjectDetection",
+//      qos: .userInteractive
+//    )
 
   // MARK: Controllers that manage functionality
-  // Handles all the camera related functionality
-  private lazy var cameraCapture = CameraFeedManager(previewView: previewView)
-
-  // Handles all data preprocessing and makes calls to run inference through the
-  // `ObjectDetectorHelper`.
-  private var objectDetectorHelper: ObjectDetectorHelper?
-
   // Handles the presenting of results on the screen
   private var inferenceViewController: InferenceViewController?
+  private var cameraViewController: CameraViewController?
+  private var mediaLibraryViewController: MediaLibraryViewController?
 
   // MARK: View Handling Methods
   override func viewDidLoad() {
     super.viewDidLoad()
     // Create object detector helper
-    objectDetectorHelper = ObjectDetectorHelper(model: model, maxResults: maxResults, scoreThreshold: scoreThreshold, runningMode: runningMode, delegate: self)
-
-    runningModeTabbar.selectedItem = cameraTabbarItem
+    
+    inferenceViewController?.isUIEnabled = false
+    runningModeTabbar.selectedItem = runningModeTabbar.items?.first
     runningModeTabbar.delegate = self
-    cameraCapture.delegate = self
-    overlayView.clearsContextBeforeDrawing = true
-  }
-  override func viewWillAppear(_ animated: Bool) {
-    super.viewWillAppear(animated)
-#if !targetEnvironment(simulator)
-    if runningMode == .liveStream {
-      cameraCapture.checkCameraConfigurationAndStartSession()
+    guard let viewController = UIStoryboard(name: "Main", bundle: .main).instantiateViewController(withIdentifier: "CAMERA_VIEW_CONTROLLER") as? CameraViewController else {
+      return
     }
-#endif
+    viewController.inferenceResultDeliveryDelegate = self
+    viewController.interfaceUpdatesDelegate = self
+    cameraViewController = viewController
+    switchTo(childViewController: viewController, fromViewController: nil)
+    
+    overlayView.clearsContextBeforeDrawing = true
+    
+    NotificationCenter.default.addObserver(self, selector: #selector(orientationChanged), name: UIDevice.orientationDidChangeNotification, object: nil)
+    
   }
-
-#if !targetEnvironment(simulator)
-  override func viewWillDisappear(_ animated: Bool) {
-    super.viewWillDisappear(animated)
-    cameraCapture.stopSession()
-  }
-#endif
-
+  
   override var preferredStatusBarStyle: UIStatusBarStyle {
     return .lightContent
+  }
+  
+  // MARK: notification methods
+  @objc func orientationChanged(notification: Notification) {
+    
+    guard let tabBarItems = runningModeTabbar.items, tabBarItems.count == 2 else {
+      return
+    }
+    switch runningModeTabbar.selectedItem {
+      case tabBarItems[0]:
+        break
+      case tabBarItems[1]:
+        mediaLibraryViewController?.orientationChanged(deviceOrientation: UIDevice.current.orientation)
+     default:
+        break
+    }
+//    switch orientation {
+//      case .up:
+//
+//      case .left:
+//      case .right:
+//      default:
+//        break
+//    }
   }
 
   // MARK: Storyboard Segue Handlers
@@ -131,92 +141,6 @@ class ViewController: UIViewController {
       bottomSheetViewBottomSpace.constant = -inferenceBottomHeight + expandButtonHeight
       view.layoutSubviews()
     }
-  }
-
-  // MARK: IBAction
-
-  @IBAction func addPhotoButtonTouchUpInside(_ sender: Any) {
-    openImagePickerController()
-  }
-  // Resume camera session when click button resume
-  @IBAction func resumeButtonTouchUpInside(_ sender: Any) {
-    cameraCapture.resumeInterruptedSession { isSessionRunning in
-      if isSessionRunning {
-        self.resumeButton.isHidden = true
-        self.cameraUnavailableLabel.isHidden = true
-      }
-    }
-  }
-  // MARK: Private function
-  private func openImagePickerController() {
-    if UIImagePickerController.isSourceTypeAvailable(.savedPhotosAlbum) {
-      let imagePicker = UIImagePickerController()
-      imagePicker.delegate = self
-      imagePicker.sourceType = .savedPhotosAlbum
-      imagePicker.mediaTypes = [UTType.image.identifier, UTType.movie.identifier]
-      imagePicker.allowsEditing = false
-      DispatchQueue.main.async {
-        self.present(imagePicker, animated: true, completion: nil)
-      }
-    }
-  }
-
-  private func removePlayerViewController() {
-    playerViewController.view.removeFromSuperview()
-    playerViewController.removeFromParent()
-  }
-
-  private func processVideo(url: URL) {
-    backgroundQueue.async { [weak self] in
-      guard let weakSelf = self else { return }
-      let objectDetectorHelper = ObjectDetectorHelper(model: weakSelf.model,
-                                                      maxResults: weakSelf.maxResults,
-                                                      scoreThreshold: weakSelf.scoreThreshold,
-                                                      runningMode: .video,
-                                                      delegate: nil)
-      Task {
-        let result = await objectDetectorHelper.detectVideoFile(url: url, inferenceIntervalMs: weakSelf.inferenceIntervalMs)
-        DispatchQueue.main.async {
-          weakSelf.inferenceViewController?.result = result
-          weakSelf.inferenceViewController?.updateData()
-          let player = AVPlayer(url: url)
-          weakSelf.playerViewController.player = player
-          weakSelf.playerViewController.videoGravity = .resizeAspectFill
-          weakSelf.playerViewController.showsPlaybackControls = false
-          weakSelf.playerViewController.view.frame = weakSelf.previewView.bounds
-          weakSelf.previewView.addSubview(weakSelf.playerViewController.view)
-          weakSelf.addChild(weakSelf.playerViewController)
-          player.play()
-          NotificationCenter.default.removeObserver(weakSelf)
-          NotificationCenter.default
-            .addObserver(weakSelf,
-                         selector: #selector(weakSelf.playerDidFinishPlaying),
-                         name: .AVPlayerItemDidPlayToEndTime,
-                         object: player.currentItem
-            )
-
-          weakSelf.videoDetectTimer?.invalidate()
-          weakSelf.videoDetectTimer = Timer.scheduledTimer(
-            withTimeInterval: weakSelf.inferenceIntervalMs / 1000,
-            repeats: true, block: { _ in
-              let currentTime: CMTime = player.currentTime()
-              let index = Int(currentTime.seconds * 1000 / weakSelf.inferenceIntervalMs)
-              guard let result = result,
-                    index < result.objectDetectorResults.count else { return }
-              DispatchQueue.main.async {
-                weakSelf.drawAfterPerformingCalculations(
-                  onDetections: result.objectDetectorResults[index]?.detections ?? [], orientation: .up,
-                  withImageSize: result.size)
-              }
-          })
-        }
-      }
-    }
-  }
-
-  @objc func playerDidFinishPlaying(note: NSNotification) {
-    videoDetectTimer?.invalidate()
-    videoDetectTimer = nil
   }
 
   // MARK: Handle ovelay function
@@ -315,122 +239,6 @@ class ViewController: UIViewController {
   }
 }
 
-// MARK: UIImagePickerControllerDelegate, UINavigationControllerDelegate
-extension ViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-  func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-    picker.dismiss(animated: true)
-    if info[.mediaType] as? String == UTType.movie.identifier {
-      guard let mediaURL = info[.mediaURL] as? URL else { return }
-      imageEmptyLabel.isHidden = true
-      processVideo(url: mediaURL)
-    } else {
-      guard let image = info[.originalImage] as? UIImage else { return }
-      imageEmptyLabel.isHidden = true
-      if runningMode != .image {
-        runningMode = .image
-      }
-      removePlayerViewController()
-      previewView.image = image
-      // Pass the uiimage to mediapipe
-      backgroundQueue.async {
-        let result = self.objectDetectorHelper?.detect(image: image)
-        // Display results by handing off to the InferenceViewController.
-        self.inferenceViewController?.result = result
-        DispatchQueue.main.async {
-          self.inferenceViewController?.updateData()
-          if let objectDetectorResult = result?.objectDetectorResults.first {
-            self.drawAfterPerformingCalculations(onDetections: objectDetectorResult?.detections ?? [], orientation: image.imageOrientation, withImageSize: image.size)
-          }
-        }
-      }
-    }
-  }
-}
-
-// MARK: CameraFeedManagerDelegate Methods
-extension ViewController: CameraFeedManagerDelegate {
-
-  func didOutput(sampleBuffer: CMSampleBuffer, orientation: UIImage.Orientation) {
-    let currentTimeMs = Date().timeIntervalSince1970 * 1000
-    // Pass the pixel buffer to mediapipe
-    backgroundQueue.async { [weak self] in
-      self?.objectDetectorHelper?.detectAsync(videoFrame: sampleBuffer, orientation: orientation, timeStamps: Int(currentTimeMs))
-    }
-  }
-
-  // MARK: Session Handling Alerts
-  func sessionWasInterrupted(canResumeManually resumeManually: Bool) {
-
-    // Updates the UI when session is interupted.
-    if resumeManually {
-      self.resumeButton.isHidden = false
-    } else {
-      self.cameraUnavailableLabel.isHidden = false
-    }
-  }
-
-  func sessionInterruptionEnded() {
-    // Updates UI once session interruption has ended.
-    if !self.cameraUnavailableLabel.isHidden {
-      self.cameraUnavailableLabel.isHidden = true
-    }
-
-    if !self.resumeButton.isHidden {
-      self.resumeButton.isHidden = true
-    }
-  }
-
-  func sessionRunTimeErrorOccured() {
-    // Handles session run time error by updating the UI and providing a button if session can be
-    // manually resumed.
-    self.resumeButton.isHidden = false
-    previewView.shouldUseClipboardImage = true
-  }
-
-  func presentCameraPermissionsDeniedAlert() {
-    let alertController = UIAlertController(
-      title: "Camera Permissions Denied",
-      message:
-        "Camera permissions have been denied for this app. You can change this by going to Settings",
-      preferredStyle: .alert)
-
-    let cancelAction = UIAlertAction(title: "Cancel", style: .cancel, handler: nil)
-    let settingsAction = UIAlertAction(title: "Settings", style: .default) { (action) in
-      UIApplication.shared.open(
-        URL(string: UIApplication.openSettingsURLString)!, options: [:], completionHandler: nil)
-    }
-    alertController.addAction(cancelAction)
-    alertController.addAction(settingsAction)
-
-    present(alertController, animated: true, completion: nil)
-
-    previewView.shouldUseClipboardImage = true
-  }
-
-  func presentVideoConfigurationErrorAlert() {
-    let alert = UIAlertController(
-      title: "Camera Configuration Failed", message: "There was an error while configuring camera.",
-      preferredStyle: .alert)
-    alert.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
-
-    self.present(alert, animated: true)
-    previewView.shouldUseClipboardImage = true
-  }
-}
-
-// MARK: ObjectDetectorHelperDelegate
-extension ViewController: ObjectDetectorHelperDelegate {
-  func objectDetectorHelper(_ objectDetectorHelper: ObjectDetectorHelper, didFinishDetection result: ResultBundle?, error: Error?) {
-    DispatchQueue.main.async {
-      self.inferenceViewController?.result = result
-      self.inferenceViewController?.updateData()
-      if let objectDetectorResult = result?.objectDetectorResults.first,
-         self.runningModeTabbar.selectedItem == self.cameraTabbarItem {
-        self.drawAfterPerformingCalculations(onDetections: objectDetectorResult?.detections ?? [], orientation: self.cameraCapture.orientation, withImageSize: self.cameraCapture.videoFrameSize)
-      }
-    }
-  }
-}
 
 // MARK: InferenceViewControllerDelegate Methods
 extension ViewController: InferenceViewControllerDelegate {
@@ -455,48 +263,77 @@ extension ViewController: InferenceViewControllerDelegate {
         isModelNeedsRefresh = true
       }
       self.model = model
-    case .changeBottomSheetViewBottomSpace(let isExpand):
-      bottomSheetViewBottomSpace.constant = isExpand ? 0 : -inferenceBottomHeight + expandButtonHeight
-      UIView.animate(withDuration: 0.3) {
-        self.view.layoutSubviews()
-      }
+    default:
+      break
     }
-    if isModelNeedsRefresh {
-      objectDetectorHelper = ObjectDetectorHelper(
-        model: self.model,
-        maxResults: self.maxResults,
-        scoreThreshold: self.scoreThreshold,
-        runningMode: self.runningMode,
-        delegate: self
-      )
+  }
+  
+  func viewController(_ viewController: InferenceViewController, didSwitchBottomSheetViewState isOpen: Bool) {
+    
+    var totalBottomSheetHeight: CGFloat = expandButtonHeight
+    
+    if isOpen == true {
+      bottomSheetViewBottomSpace.constant = 0.0
+      totalBottomSheetHeight = inferenceBottomHeight
+    }
+    else {
+      bottomSheetViewBottomSpace.constant = -inferenceBottomHeight + expandButtonHeight
+    }
+  
+    UIView.animate(withDuration: 0.3) {[weak self] in
+      self?.view.layoutSubviews()
+      self?.mediaLibraryViewController?.layoutUIElements(withInferenceViewHeight: totalBottomSheetHeight)
+      
     }
   }
 }
 
 // MARK: UITabBarDelegate
 extension ViewController: UITabBarDelegate {
+  
+  func switchTo(childViewController: UIViewController, fromViewController: UIViewController?) {
+    fromViewController?.willMove(toParent: nil)
+    fromViewController?.view.removeFromSuperview()
+    fromViewController?.removeFromParent()
+    
+    addChild(childViewController)
+    childViewController.view.translatesAutoresizingMaskIntoConstraints = false
+    tabBarContainerView.addSubview(childViewController.view)
+    NSLayoutConstraint.activate(
+      [
+        childViewController.view.leadingAnchor.constraint(equalTo: tabBarContainerView.leadingAnchor, constant: 0.0),
+      childViewController.view.trailingAnchor.constraint(equalTo: tabBarContainerView.trailingAnchor, constant: 0.0),
+      childViewController.view.topAnchor.constraint(equalTo: tabBarContainerView.topAnchor, constant: 0.0),
+      childViewController.view.bottomAnchor.constraint(equalTo: tabBarContainerView.bottomAnchor, constant: 0.0)
+      ]
+    )
+    childViewController.didMove(toParent: self)
+  }
+  
   func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
+    
+    guard let tabBarItems = tabBar.items, tabBarItems.count == 2 else {
+      return
+    }
+    
     switch item {
-    case cameraTabbarItem:
-      if runningMode != .liveStream {
-        runningMode = .liveStream
+    case tabBarItems[0]:
+      runningMode = .liveStream
+      guard let viewController = cameraViewController else {
+        return
       }
-      removePlayerViewController()
-    #if !targetEnvironment(simulator)
-      cameraCapture.checkCameraConfigurationAndStartSession()
-    #endif
-      previewView.shouldUseClipboardImage = false
-      addImageButton.isHidden = true
-      imageEmptyLabel.isHidden = true
-    case photoTabbarItem:
-#if !targetEnvironment(simulator)
-      cameraCapture.stopSession()
-#endif
-      previewView.shouldUseClipboardImage = true
-      addImageButton.isHidden = false
-      if previewView.image == nil || playerViewController.parent != self {
-        imageEmptyLabel.isHidden = false
+      switchTo(childViewController: viewController, fromViewController: mediaLibraryViewController)
+    
+    case tabBarItems[1]:
+      if mediaLibraryViewController == nil {
+        guard let viewController = UIStoryboard(name: "Main", bundle: .main).instantiateViewController(withIdentifier: "MEDIA_LIBRARY_VIEW_CONTROLLER") as? MediaLibraryViewController else {
+          return
+        }
+        mediaLibraryViewController = viewController
       }
+        
+      switchTo(childViewController: mediaLibraryViewController!, fromViewController: cameraViewController)
+      
     default:
       break
     }
@@ -505,26 +342,20 @@ extension ViewController: UITabBarDelegate {
   }
 }
 
-// MARK: Define default constants
-enum DefaultConstants {
-  static let maxResults = 3
-  static let scoreThreshold: Float = 0.2
-  static let model: Model = .efficientdetLite0
+extension ViewController: InferenceResultDeliveryDelegate {
+  
+  func didPerformInference(result: ResultBundle?) {
+    var inferenceTimeString = ""
+    
+    if let inferenceTime = result?.inferenceTime {
+      inferenceTimeString = String(format: "%.2fms", inferenceTime)
+    }
+    inferenceViewController?.update(inferenceTimeString: inferenceTimeString)
+  }
 }
 
-// MARK: Model
-enum Model: String, CaseIterable {
-    case efficientdetLite0 = "EfficientDet-Lite0"
-    case efficientdetLite2 = "EfficientDet-Lite2"
-
-    var modelPath: String? {
-        switch self {
-        case .efficientdetLite0:
-            return Bundle.main.path(
-                forResource: "efficientdet_lite0", ofType: "tflite")
-        case .efficientdetLite2:
-            return Bundle.main.path(
-                forResource: "efficientdet_lite2", ofType: "tflite")
-        }
-    }
+extension ViewController: InterfaceUpdatesDelegate {
+  func shouldClicksBeEnabled(_ isEnabled: Bool) {
+    inferenceViewController?.isUIEnabled = isEnabled
+  }
 }
