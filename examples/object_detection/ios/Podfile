@@ -1,10 +1,10 @@
 # Uncomment the next line to define a global platform for your project
 # platform :ios, '9.0'
-source 'https://github.com/priankakariatyml/mpp-task-pod-test.git'
+#source 'https://github.com/priankakariatyml/mpp-task-pod-test.git'
 target 'ObjectDetector' do
 
   use_frameworks!
-  pod 'MediaPipeTasksVision', '7.0.0'
+  pod 'MediaPipeTasksVision', '0.10.2-alpha-3'
 
   # Pods for ObjectDetector
 end

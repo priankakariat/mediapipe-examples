@@ -15,15 +15,10 @@
 import UIKit
 import MediaPipeTasksVision
 
-protocol InferenceViewControllerDelegate {
-
+protocol InferenceViewControllerDelegate: AnyObject {
   /**
-   This method is called when the user changes the value to update model used for inference.
-   **/
-  func viewController(
-    _ viewController: InferenceViewController,
-    needPerformActions action: InferenceViewController.Action)
-  
+   This method is called when the user opens or closes the bottom sheet.
+  **/
   func viewController(
     _ viewController: InferenceViewController,
     didSwitchBottomSheetViewState isOpen: Bool)
@@ -38,71 +33,71 @@ class InferenceViewController: UIViewController {
     case changeBottomSheetViewBottomSpace(Bool)
   }
 
-  // MARK: Delegate
-  var delegate: InferenceViewControllerDelegate?
+  // MARK: Delegates
+  weak var delegate: InferenceViewControllerDelegate?
 
   // MARK: Storyboards Connections
   @IBOutlet weak var choseModelButton: UIButton!
-
-  @IBOutlet weak var infrenceTimeLabel: UILabel!
-  @IBOutlet weak var infrenceTimeTitleLabel: UILabel!
-  @IBOutlet weak var thresholdStepper: UIStepper!
+  @IBOutlet weak var inferenceTimeNameLabel: UILabel!
+  @IBOutlet weak var inferenceTimeLabel: UILabel!
   @IBOutlet weak var thresholdValueLabel: UILabel!
-
+  @IBOutlet weak var thresholdStepper: UIStepper!
   @IBOutlet weak var maxResultStepper: UIStepper!
   @IBOutlet weak var maxResultLabel: UILabel!
-
+  @IBOutlet weak var toggleBottomSheetButton: UIButton!
+  @IBOutlet weak var toggleBottomSheetButtonTopSpace: NSLayoutConstraint!
+  
   // MARK: Instance Variables
-  var maxResults = DefaultConstants.maxResults
-  var scoreThreshold = DefaultConstants.scoreThreshold
-  var modelChose = DefaultConstants.model
   var isUIEnabled: Bool = false {
     didSet {
       enableOrDisableClicks()
     }
   }
   
-  private var resultIndex = 0
-
   override func viewDidLoad() {
     super.viewDidLoad()
     setupUI()
     enableOrDisableClicks()
   }
+  
+  // MARK: - Public Functions
+  func update(inferenceTimeString: String) {
+    inferenceTimeLabel.text = inferenceTimeString
+    inferenceTimeNameLabel.isHidden = false
+  }
 
-  // Private function
+  // MARK: - Private function
   private func setupUI() {
 
-    maxResultStepper.value = Double(maxResults)
-    maxResultLabel.text = "\(maxResults)"
+    maxResultStepper.value = Double(DetectorMetadata.sharedInstance.maxResults)
+    maxResultLabel.text = "\(DetectorMetadata.sharedInstance.maxResults)"
 
-    thresholdStepper.value = Double(scoreThreshold)
-    thresholdValueLabel.text = "\(scoreThreshold)"
+    thresholdStepper.value = Double(DetectorMetadata.sharedInstance.scoreThreshold)
+    thresholdValueLabel.text = "\(DetectorMetadata.sharedInstance.scoreThreshold)"
 
-    // Chose model option
-    let choseModel = {(action: UIAction) in
+    // Choose model option
+    let selectedModelAction = {(action: UIAction) in
       self.updateModel(modelTitle: action.title)
     }
+    
     let actions: [UIAction] = Model.allCases.compactMap { model in
-      let action = UIAction(title: model.rawValue, handler: choseModel)
-      if model == modelChose {
-        action.state = .on
-      }
-      return action
+      return UIAction(
+        title: model.name,
+        state: (DetectorMetadata.sharedInstance.model == model) ? .on : .off,
+        handler: selectedModelAction
+      )
     }
+    
     choseModelButton.menu = UIMenu(children: actions)
     choseModelButton.showsMenuAsPrimaryAction = true
     choseModelButton.changesSelectionAsPrimaryAction = true
   }
   
   private func updateModel(modelTitle: String) {
-    guard let model = Model(rawValue: modelTitle) else { return }
-    delegate?.viewController(self, needPerformActions: .changeModel(model))
-  }
-
-  // Public function
-  func update(inferenceTimeString: String) {
-    infrenceTimeLabel.text = inferenceTimeString
+    guard let model = Model(name: modelTitle) else {
+      return
+    }
+    DetectorMetadata.sharedInstance.model = model
   }
   
   private func enableOrDisableClicks() {
@@ -110,25 +105,24 @@ class InferenceViewController: UIViewController {
     maxResultStepper.isEnabled = isUIEnabled
     thresholdStepper.isEnabled = isUIEnabled
   }
-
+  
   // MARK: IBAction
-
   @IBAction func expandButtonTouchUpInside(_ sender: UIButton) {
     sender.isSelected.toggle()
-    infrenceTimeLabel.isHidden = !sender.isSelected
-    infrenceTimeTitleLabel.isHidden = !sender.isSelected
+    inferenceTimeLabel.isHidden = !sender.isSelected
+    inferenceTimeNameLabel.isHidden = !sender.isSelected
     delegate?.viewController(self, didSwitchBottomSheetViewState: sender.isSelected)
   }
 
   @IBAction func thresholdStepperValueChanged(_ sender: UIStepper) {
-    scoreThreshold = Float(sender.value)
-    delegate?.viewController(self, needPerformActions: .changeScoreThreshold(scoreThreshold))
+    let scoreThreshold = Float(sender.value)
+    DetectorMetadata.sharedInstance.scoreThreshold = scoreThreshold
     thresholdValueLabel.text = "\(scoreThreshold)"
   }
 
   @IBAction func maxResultStepperValueChanged(_ sender: UIStepper) {
-    maxResults = Int(sender.value)
-    delegate?.viewController(self, needPerformActions: .changeMaxResults(maxResults))
+    let maxResults = Int(sender.value)
+    DetectorMetadata.sharedInstance.maxResults = maxResults
     maxResultLabel.text = "\(maxResults)"
   }
 }
