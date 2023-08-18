@@ -21,7 +21,7 @@ class MediaLibraryViewController: UIViewController {
   
   private struct Constants {
     static let edgeOffset: CGFloat = 2.0
-    static let inferenceTimeIntervalMs: Int64 = 300
+    static let inferenceTimeIntervalMs = 300.0
     static let kMilliSeconds: Int64 = 1000
     static let savedPhotosNotAvailableText = "Saved photos album is not available."
     static let mediaEmptyText =
@@ -32,6 +32,7 @@ class MediaLibraryViewController: UIViewController {
   private lazy var pickerController = UIImagePickerController()
   private var playerViewController: AVPlayerViewController?
   private var objectDetectorService: ObjectDetectorService?
+  private var videoTimer: Timer?
   
   weak var interfaceUpdatesDelegate: InterfaceUpdatesDelegate?
   
@@ -117,7 +118,9 @@ class MediaLibraryViewController: UIViewController {
       playerViewController?.willMove(toParent: nil)
       playerViewController?.removeFromParent()
     }
-    removeObservers(player: playerViewController?.player)
+    videoTimer?.invalidate()
+    videoTimer = nil
+//    removeObservers(player: playerViewController?.player)
     playerViewController?.player?.pause()
     playerViewController?.player = nil
   }
@@ -221,12 +224,17 @@ extension MediaLibraryViewController: UIImagePickerControllerDelegate, UINavigat
       Task {
         interfaceUpdatesDelegate?.shouldClicksBeEnabled(false)
         showProgressView()
+        
+        guard let videoDurationInMilliseconds = try? await asset.load(.duration).seconds * 1000 else {
+          return
+        }
         let resultBundle = await self.objectDetectorService?.detect(
           videoAsset:asset,
-          inferenceIntervalMs: Double(Constants.inferenceTimeIntervalMs))
+          durationInMilliseconds: videoDurationInMilliseconds,
+          inferenceIntervalInMilliseconds: Constants.inferenceTimeIntervalMs)
         hideProgressView()
         
-        playVideo(mediaURL: mediaURL, resultBundle: resultBundle)
+        play(videoAsset: asset, videoDurationInMilliseconds: videoDurationInMilliseconds,  resultBundle: resultBundle)
       }
       imageEmptyLabel.isHidden = true
     case UTType.image.identifier:
@@ -291,34 +299,69 @@ extension MediaLibraryViewController: UIImagePickerControllerDelegate, UINavigat
     }
   }
   
-  private func playVideo(mediaURL: URL, resultBundle: ResultBundle?) {
-    playVideo(asset: AVAsset(url: mediaURL))
-    playerTimeObserverToken = playerViewController?.player?.addPeriodicTimeObserver(
-      forInterval: CMTime(value: Constants.inferenceTimeIntervalMs,
-                          timescale: Int32(Constants.kMilliSeconds)),
-      queue: DispatchQueue(label: "com.google.mediapipe.MediaLibraryViewController.timeObserverQueue", qos: .userInteractive),
-      using: { [weak self] (time: CMTime) in
-        DispatchQueue.main.async {
-          let index =
-            Int(CMTimeGetSeconds(time) * Double(Constants.kMilliSeconds) / Double(Constants.inferenceTimeIntervalMs))
-          guard
-                let weakSelf = self,
-                let resultBundle = resultBundle,
-                index < resultBundle.objectDetectorResults.count,
-                let objectDetectorResult = resultBundle.objectDetectorResults[index] else {
-            return
-          }
-          
-          weakSelf.overlayView.draw(
-            objectOverlays:ObjectOverlayHelper.objectOverlays(
-              fromDetections: objectDetectorResult.detections,
-              inferredOnImageOfSize: resultBundle.size,
-              andOrientation:  .up),
-            inBoundsOfContentImageOfSize: resultBundle.size,
-            edgeOffset: Constants.edgeOffset,
-            imageContentMode: .scaleAspectFit)
+  private func play(videoAsset: AVAsset, videoDurationInMilliseconds: Double, resultBundle: ResultBundle?) {
+    playVideo(asset: videoAsset)
+    videoTimer = nil
+    
+    var currentPlayTime = 0.0
+    print(videoDurationInMilliseconds)
+    
+    videoTimer = Timer.scheduledTimer(withTimeInterval: Constants.inferenceTimeIntervalMs/Double(Constants.kMilliSeconds), repeats: true, block: {[weak self] timer in
+      currentPlayTime += Constants.inferenceTimeIntervalMs
+      print("Curr play time \(currentPlayTime)")
+      
+      guard currentPlayTime < videoDurationInMilliseconds else {
+        self?.videoTimer?.invalidate()
+        self?.overlayView.clear()
+        self?.interfaceUpdatesDelegate?.shouldClicksBeEnabled(true)
+        return
+      }
+        
+      let index =
+        Int(currentPlayTime / Constants.inferenceTimeIntervalMs)
+        guard
+          let weakSelf = self,
+          let resultBundle = resultBundle,
+          index < resultBundle.objectDetectorResults.count,
+          let objectDetectorResult = resultBundle.objectDetectorResults[index] else {
+          return
         }
+        
+        weakSelf.overlayView.draw(
+          objectOverlays:ObjectOverlayHelper.objectOverlays(
+            fromDetections: objectDetectorResult.detections,
+            inferredOnImageOfSize: resultBundle.size,
+            andOrientation:  .up),
+          inBoundsOfContentImageOfSize: resultBundle.size,
+          edgeOffset: Constants.edgeOffset,
+          imageContentMode: .scaleAspectFit)
     })
+//    playerTimeObserverToken = playerViewController?.player?.addPeriodicTimeObserver(
+//      forInterval: CMTime(value: Constants.inferenceTimeIntervalMs,
+//                          timescale: Int32(Constants.kMilliSeconds)),
+//      queue: DispatchQueue(label: "com.google.mediapipe.MediaLibraryViewController.timeObserverQueue", qos: .userInteractive),
+//      using: { [weak self] (time: CMTime) in
+//        DispatchQueue.main.async {
+//          let index =
+//            Int(CMTimeGetSeconds(time) * Double(Constants.kMilliSeconds) / Double(Constants.inferenceTimeIntervalMs))
+//          guard
+//                let weakSelf = self,
+//                let resultBundle = resultBundle,
+//                index < resultBundle.objectDetectorResults.count,
+//                let objectDetectorResult = resultBundle.objectDetectorResults[index] else {
+//            return
+//          }
+//
+//          weakSelf.overlayView.draw(
+//            objectOverlays:ObjectOverlayHelper.objectOverlays(
+//              fromDetections: objectDetectorResult.detections,
+//              inferredOnImageOfSize: resultBundle.size,
+//              andOrientation:  .up),
+//            inBoundsOfContentImageOfSize: resultBundle.size,
+//            edgeOffset: Constants.edgeOffset,
+//            imageContentMode: .scaleAspectFit)
+//        }
+//    })
   }
   
   private func playVideo(asset: AVAsset) {
@@ -338,12 +381,12 @@ extension MediaLibraryViewController: UIImagePickerControllerDelegate, UINavigat
     playerViewController?.showsPlaybackControls = false
     addPlayerViewControllerAsChild()
     
-    NotificationCenter.default
-      .addObserver(self,
-                   selector: #selector(self.playerDidFinishPlaying),
-                   name: .AVPlayerItemDidPlayToEndTime,
-                   object: playerItem
-      )
+//    NotificationCenter.default
+//      .addObserver(self,
+//                   selector: #selector(self.playerDidFinishPlaying),
+//                   name: .AVPlayerItemDidPlayToEndTime,
+//                   object: playerItem
+//      )
     playerViewController?.player?.play()
   }
   

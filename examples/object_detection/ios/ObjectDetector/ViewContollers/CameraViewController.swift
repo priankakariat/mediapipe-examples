@@ -26,7 +26,7 @@ class CameraViewController: UIViewController {
   weak var inferenceResultDeliveryDelegate: InferenceResultDeliveryDelegate?
   weak var interfaceUpdatesDelegate: InterfaceUpdatesDelegate?
   
-  @IBOutlet weak var previewView: PreviewView!
+  @IBOutlet weak var previewView: UIView!
   @IBOutlet weak var cameraUnavailableLabel: UILabel!
   @IBOutlet weak var resumeButton: UIButton!
   @IBOutlet weak var overlayView: OverlayView!
@@ -90,8 +90,14 @@ class CameraViewController: UIViewController {
     super.viewDidLoad()
 #if !targetEnvironment(simulator)
     cameraFeedService.delegate = self
+    cameraFeedService.updateVideoPreviewLayer(toFrame: previewView.bounds)
 #endif
     // Do any additional setup after loading the view.
+  }
+  
+  override func viewWillLayoutSubviews() {
+    super.viewWillLayoutSubviews()
+    cameraFeedService.updateVideoPreviewLayer(toFrame: previewView.bounds)
   }
   
   @IBAction func onClickResume(_ sender: Any) {
@@ -259,7 +265,7 @@ extension CameraViewController: ObjectDetectorServiceLiveStreamDelegate {
             deviceOrientation: UIDevice.current.orientation)),
         inBoundsOfContentImageOfSize: imageSize,
         edgeOffset: Constants.edgeOffset,
-        imageContentMode: weakSelf.previewView.previewLayer.videoGravity.contentMode)
+        imageContentMode: weakSelf.cameraFeedService.videoGravity.contentMode)
     }
   }
 }
