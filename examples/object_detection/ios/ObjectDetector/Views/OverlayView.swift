@@ -49,7 +49,7 @@ class OverlayView: UIView {
     objectOverlays: [ObjectOverlay],
     inBoundsOfContentImageOfSize imageSize: CGSize,
     edgeOffset: CGFloat = 0.0,
-    imageContentMode: UIView.ContentMode) {
+    imageContentMode: UIView.ContentMode = .scaleAspectFit) {
       
       self.clear()
       contentImageSize = imageSize

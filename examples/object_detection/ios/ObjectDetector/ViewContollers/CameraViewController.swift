@@ -90,9 +90,14 @@ class CameraViewController: UIViewController {
     super.viewDidLoad()
 #if !targetEnvironment(simulator)
     cameraFeedService.delegate = self
-    cameraFeedService.updateVideoPreviewLayer(toFrame: previewView.bounds)
+//    cameraFeedService.updateVideoPreviewLayer(toFrame: previewView.bounds)
 #endif
     // Do any additional setup after loading the view.
+  }
+  
+  override func viewDidAppear(_ animated: Bool) {
+    super.viewDidAppear(animated)
+    cameraFeedService.updateVideoPreviewLayer(toFrame: previewView.bounds)
   }
   
   override func viewWillLayoutSubviews() {
