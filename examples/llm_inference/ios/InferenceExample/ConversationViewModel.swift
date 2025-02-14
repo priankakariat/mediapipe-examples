@@ -71,11 +71,14 @@ enum InferenceError: LocalizedError {
 /// Holds the names of the models names that can be  used.
 enum Model: CaseIterable {
   case gemma
+  case gemma_cpu
 
   private var path: (name: String, extension: String) {
     switch self {
-    case .gemma:
-      return ("gemma-2b-it-cpu-int4", "bin")
+      case .gemma:
+        return ("gemma-2b-it-cpu-int4", "bin")
+      case .gemma_cpu:
+        return ("gemma_cpu", "bin")
     }
   }
 
@@ -117,7 +120,7 @@ class ConversationViewModel: ObservableObject {
       busy = false
     }
     do {
-      let model = try OnDeviceModel(model: Model.gemma)
+      let model = try OnDeviceModel(model: Model.gemma_cpu)
       self.model = model
       chat = try Chat(model: model)
     } catch let error as InferenceError {
@@ -195,12 +198,15 @@ class ConversationViewModel: ObservableObject {
           messages.append(ChatMessage(participant: .system))
         }
         let systemMessageText = messages[messages.count - 1].text
+        
+        messages[messages.count - 1].text = systemMessageText + partialResult
+        print("Message_____\(partialResult)xxxxx")
 
         /// Trim any leading characters in whole message. Note: can safely access the index 
         /// `messages.count - 1` since the presence of a last message has already been guaranteed 
         /// by the previous code snippet.
-        messages[messages.count - 1].text = String(
-          (systemMessageText + partialResult).drop(while: { $0.isWhitespace || $0.isNewline }))
+//        messages[messages.count - 1].text = String(
+//          (systemMessageText + partialResult).drop(while: { $0.isWhitespace || $0.isNewline }))
       }
     } catch {
       /// `chat.sendMessage(text)` throws only MediaPipeTask errors. Hence all errors thrown from 

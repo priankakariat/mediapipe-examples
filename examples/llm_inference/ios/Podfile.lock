@@ -1,20 +1,20 @@
 PODS:
-  - MediaPipeTasksGenAI (0.10.14):
-    - MediaPipeTasksGenAIC (= 0.10.14)
-  - MediaPipeTasksGenAIC (0.10.14)
+  - MediaPipeTasksGenAI (19.0.0):
+    - MediaPipeTasksGenAIC (= 19.0.0)
+  - MediaPipeTasksGenAIC (19.0.0)
 
 DEPENDENCIES:
   - MediaPipeTasksGenAI
 
 SPEC REPOS:
-  trunk:
+  https://github.com/priankakariatyml/mpp-task-pod-test.git:
     - MediaPipeTasksGenAI
     - MediaPipeTasksGenAIC
 
 SPEC CHECKSUMS:
-  MediaPipeTasksGenAI: 8cd77fa32ea21f7a6319b025aa28cfc3e20ab73b
-  MediaPipeTasksGenAIC: 270ec81f85e96fac283945702e34112ebbfd5e77
+  MediaPipeTasksGenAI: 52df3ee3e8b6d4c2e89757fb78f8278a5b5b03f0
+  MediaPipeTasksGenAIC: bc6924fa755d81a3eb1076508b710d8df7479050
 
-PODFILE CHECKSUM: b561fe84c5e19b81e1111ba0f8f21564f7006b85
+PODFILE CHECKSUM: 969ae0fe28dc0a278b683453532f3162292e621c
 
 COCOAPODS: 1.15.2
