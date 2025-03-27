@@ -23,7 +23,12 @@ struct ModelSelectionScreen: View {
       .navigationTitle("Models")
       .navigationBarTitleDisplayMode(.inline)
       .navigationDestination(for: Model.self) { model in
-        ConversationScreen(viewModel: ConversationViewModel(modelCategory: model))
+        if let _ = try? model.modelPath {
+          ConversationScreen(viewModel: ConversationViewModel(modelCategory: model))
+        }
+        else {
+          LoginView()
+        }
       }
     }
   }
