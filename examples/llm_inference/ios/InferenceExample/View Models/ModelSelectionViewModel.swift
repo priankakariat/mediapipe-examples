@@ -12,26 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import Foundation
+
 import SwiftUI
 
-@main
-struct InferenceExampleApp: App {
-  
-  init() {
-    /// Delete keys if this is the first launch of the app. Since the app is not explicitly handling logout, user can delete the app to clear
-    /// the current session if they want to login to a new account.
-    /// Any keys saved to the key chain will be persisted by iOS inspite of the app being uninstalled.
-    var keys = [OAuthService.accessTokenKey]
-    
-    for model in Model.allCases {
-      keys.append(model.licenseAcnowledgedKey)
-    }
-    KeyChainHelper.checkAndClearKeys(keys)
-  }
+enum NavigationDestination: CaseIterable {
+  case login
+  case conversation
+  case download
+}
 
-  var body: some Scene {
-    WindowGroup {
-      ModelSelectionScreen()
+
+// ViewModel to handle navigation logic
+class ModelSelectionViewModel: ObservableObject {
+  // Example conditions to trigger navigation
+  func navigationDestination(model: Model) -> NavigationDestination {
+    if let _ = try? model.modelPath {
+      return .conversation
+    }
+    else if let _ = KeyChainHelper.load(key: "token") {
+      return .download
+    }
+    else {
+      return .login
     }
   }
 }

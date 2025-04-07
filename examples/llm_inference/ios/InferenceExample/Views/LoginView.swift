@@ -13,38 +13,110 @@
 // limitations under the License.
 
 import SwiftUI
+import AuthenticationServices
+import CryptoKit
 
 struct LoginView: View {
+//  @EnvironmentObject var huggingFaceFlowViewModel: HuggingFaceFlowViewModel // Access the ParentViewModel
+
   let logoName: String = "HfLogo"
   let text = "Sign In with Hugging Face"
+  let onLoginSuccess: () -> Void
+  @Environment(\.webAuthenticationSession) private var webAuthenticationSession
+  @StateObject private var viewModel = LoginViewModel()
+  @Environment(\.dismiss) var dismiss
+
+  
+  let authService = OAuthService()
   
   var body: some View {
-    Button(action: {
-      // Your action logic goes here
-      // Add your specific action code
-    }){
-      HStack {
-        Image(logoName)
-          .resizable()
-          .scaledToFit()
-          .frame(width: 30, height: 30) // Adjust icon size as needed
-        Text(text)
+    ZStack {
+      VStack {
+        Button(action: {
+          Task {
+            await performAuthentication()
+            DispatchQueue.main.async {
+              onLoginSuccess()
+            }
+
+//            guard let url = viewModel.getAuthorizationUrl() else {
+//              return
+//            }
+//            let urlWithToken = try await webAuthenticationSession.authenticate(using: url, callback: ASWebAuthenticationSession.Callback.customScheme("com.google.mediapipe.examples.llminference"), preferredBrowserSession: .ephemeral, additionalHeaderFields:[:])
+//            guard await viewModel.handleCallback(urlWithToken) else {
+//              return
+//            }
+//            onLoginSuccess()
+          }
+        }){
+          HStack {
+            Image(logoName)
+              .resizable()
+              .scaledToFit()
+              .frame(width: 30, height: 30) // Adjust icon size as needed
+            Text(text)
+          }
+          .buttonStyle(RoundedRectButtonStyle(backgroundColor: Color.black))
+          .disabled(viewModel.isAuthenticating)
+        }
       }
-      .padding(.horizontal, 20)
-      .padding(.vertical, 12)
-      .background(Color.black)
-      .foregroundColor(.white)
-      .cornerRadius(30) // Adjust corner radius for roundness
-      .shadow(color: Color.black.opacity(0.3), radius: 5, x: 0, y: 3)
+      if viewModel.isAuthenticating {
+        ProgressView("Authenticating...")
+      }
+    }
+    .alert(item: $viewModel.error) { error in
+      Alert(
+        title: Text(error.errorDescription!),
+        message: Text(error.failureReason),
+        dismissButton: .default(Text("OK")) {
+          // Optional: Perform actions on dismiss
+          viewModel.error = nil //Clear the error after showing the alert
+        }
+      )
+    }
+  }
+  
+  private func performAuthentication() async {
+    viewModel.isAuthenticating = true // Set to true when starting
+    defer { viewModel.isAuthenticating = false } // Ensure it’s reset even on unexpected exits
+    
+    guard let url = viewModel.getAuthorizationUrl() else {
+      return
+    }
+    
+    do {
+      let urlWithToken = try await webAuthenticationSession.authenticate(
+        using: url,
+        callback: ASWebAuthenticationSession.Callback.customScheme("com.google.mediapipe.examples.llminference"),
+        preferredBrowserSession: nil,
+        additionalHeaderFields: [:]
+      )
+     _ = await viewModel.handleCallback(urlWithToken)
+    } catch ASWebAuthenticationSessionError.canceledLogin {
+      // User dismissed the session without authenticating
+      print("Authentication canceled by user")
+      // isAuthenticating is already set to false by defer
+    }
+    catch {
+      
     }
   }
 }
-  
-  //  private struct Constants {
-  //    static let scrollDelayInSeconds = 0.05
-  //    static let alertBackgroundColor = Color.black.opacity(0.3)
-  //    static let newChatSystemSymbolName = "square.and.pencil"
-  //    static let navigationTitle = "Chat with your LLM here"
-  //    static let modelInitializationAlertText = "Model initialization in progress."
-  //  }
 
+extension View {
+  /// Displays error alert based on the value of the binding error. This function is invoked when the value of the binding error changes.
+  /// - Parameters:
+  ///   - error: Binding error based on which the alert is displayed.
+  /// - Returns: The error alert.
+  func alert(
+    error: Binding<OAuthService.OAuthError?>, buttonTitle: String = "OK"
+  ) -> some View {
+    
+    let authError = error.wrappedValue
+    
+    return alert(isPresented: .constant(authError != nil), error: authError) { _ in
+    } message: { error in
+      Text(error.failureReason)
+    }
+  }
+}

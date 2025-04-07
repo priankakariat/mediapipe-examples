@@ -1,4 +1,4 @@
-// Copyright 2024 The Mediapipe Authors.
+// Copyright 2025 The Mediapipe Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,19 +16,23 @@ import SwiftUI
 
 struct ModelSelectionScreen: View {
   var body: some View {
-    NavigationStack {
+    NavigationStack() {
       List(Model.allCases, id: \.self) { model in
         NavigationLink(model.name, value: model)
       }
       .navigationTitle("Models")
       .navigationBarTitleDisplayMode(.inline)
       .navigationDestination(for: Model.self) { model in
-        if let _ = try? model.modelPath {
-          ConversationScreen(viewModel: ConversationViewModel(modelCategory: model))
-        }
-        else {
-          LoginView()
-        }
+        ConversationScreen(viewModel: ConversationViewModel(modelCategory: model))
+//        if let _ = try? model.modelPath {
+//          ConversationScreen(viewModel: ConversationViewModel(modelCategory: model))
+//        }
+//        else if let _ = KeyChainHelper.load(key: "token") {
+//          DownloadView()
+//        }
+//        else {
+//          LoginView()
+//        }
       }
     }
   }

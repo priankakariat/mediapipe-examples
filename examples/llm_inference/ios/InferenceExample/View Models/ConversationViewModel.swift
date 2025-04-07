@@ -14,6 +14,85 @@
 
 import Foundation
 
+/// Holds the names of the models names that can be  used.
+enum Model: CaseIterable {
+  case gemmaCPU
+  case gemmaGPU
+  
+  private var path: (name: String, extension: String) {
+    switch self {
+      case .gemmaCPU:
+        return ("gemma-2b-it-cpu-int4", "bin")
+      case .gemmaGPU:
+        return ("gemma-2b-it-gpu-int4", "bin")
+    }
+  }
+  
+  var licenseAcnowledgedKey: String {
+    switch self {
+      case .gemmaCPU:
+        return "gemma-cpu-license"
+      case .gemmaGPU:
+        return "gemma-gpu-license"
+    }
+  }
+  
+  var modelPath: String {
+    get throws {
+      let documentsDirectory = try FileManager.default.url(
+        for: .documentDirectory,
+        in: .userDomainMask,
+        appropriateFor: nil,
+        create: true
+      )
+      
+      let docsURL = documentsDirectory.appendingPathComponent("\(path.name).\(path.extension)")
+      
+      if FileManager.default.fileExists(atPath: docsURL.path) {
+        print("file")
+        return docsURL.path
+      }
+      
+      guard
+        let path = Bundle.main.path(
+          forResource: path.name, ofType: path.extension)
+      else {
+        throw InferenceError.modelFileNotFound(modelName: "\(path.name).\(path.extension)")
+      }
+      return path
+    }
+  }
+  
+  var name: String {
+    switch self {
+      case .gemmaCPU:
+        return "Gemma CPU"
+      case .gemmaGPU:
+        return "Gemma GPU"
+    }
+  }
+  
+  var downloadUrl: URL? {
+    switch self {
+      case .gemmaCPU:
+        return URL(string: "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4.task")
+      case .gemmaGPU:
+        return URL(string: "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4.task")
+    }
+  }
+  
+  var licenseUrl: URL? {
+    switch self {
+      case .gemmaCPU:
+        return URL(string: "https://huggingface.co/litert-community/Gemma3-1B-IT")
+      case .gemmaGPU:
+        return URL(string: "https://huggingface.co/litert-community/Gemma3-1B-IT")
+    }
+  }
+  
+}
+
+
 @MainActor
 class ConversationViewModel: ObservableObject {
   /// This array holds both the view models responsible for presentation of both user and system messages
@@ -22,6 +101,7 @@ class ConversationViewModel: ObservableObject {
   /// .error state is set only when there are errors in loading the model and creating a new chat session.
   /// Response generation errors are relayed as messages from the model.
   enum State: Equatable {
+    case idle
     case loadingModel
     case promptSubmitted
     case streamingResponse
@@ -44,6 +124,7 @@ class ConversationViewModel: ObservableObject {
       case (.loadingModel, .loadingModel),
         (.promptSubmitted, .promptSubmitted),
         (.streamingResponse, .streamingResponse),
+        (.idle, .idle),
         (.done, .done):
         return true
       /// Error equality checks are not required for updates to the UI at the moment. If required more fine grained equality
@@ -58,10 +139,12 @@ class ConversationViewModel: ObservableObject {
   }
 
   /// Based on this property updates are made to the UI State including enabling and disabling of messaging, other buttons etc.
-  @Published var currentState: State = .loadingModel
+  @Published var currentState: State = .idle
   
+  @Published var downloadRequired: Bool = false
+    
   /// Model to initialize.
-  private var modelCategory: Model
+  var modelCategory: Model
 
   /// Model used for inference. Wraps around a MediaPipe `LlmInference`.
   private var model: OnDeviceModel?
@@ -71,6 +154,8 @@ class ConversationViewModel: ObservableObject {
 
   init(modelCategory: Model) {
     self.modelCategory = modelCategory
+    downloadRequired = (try? modelCategory.modelPath) == nil
+    currentState = downloadRequired ? .idle : .loadingModel
   }
 
   func loadModel() {
@@ -86,6 +171,10 @@ class ConversationViewModel: ObservableObject {
   }
 
   private func load(modelCategory: Model) {
+    guard !downloadRequired else {
+      return
+    }
+    
     do {
       /// Gets updated to done or error in `startNewChat()` if there is an error in chat initialization.
       currentState = .loadingModel
@@ -207,42 +296,6 @@ class ConversationViewModel: ObservableObject {
       await updateSystemViewModel(systemViewModel, responseStream: responseStream)
     } catch {
       /// systemViewModel is closed in a defer before exiting this scope. Any errors are handled during close.
-    }
-  }
-}
-
-/// Holds the names of the models names that can be  used.
-enum Model: CaseIterable {
-  case gemmaCPU
-  case gemmaGPU
-
-  private var path: (name: String, extension: String) {
-    switch self {
-    case .gemmaCPU:
-      return ("gemma-2b-it-cpu-int4", "bin")
-    case .gemmaGPU:
-      return ("gemma-2b-it-gpu-int4", "bin")
-    }
-  }
-
-  var modelPath: String {
-    get throws {
-      guard
-        let path = Bundle.main.path(
-          forResource: path.name, ofType: path.extension)
-      else {
-        throw InferenceError.modelFileNotFound(modelName: "\(path.name).\(path.extension)")
-      }
-      return path
-    }
-  }
-
-  var name: String {
-    switch self {
-    case .gemmaCPU:
-      return "Gemma CPU"
-    case .gemmaGPU:
-      return "Gemma GPU"
     }
   }
 }

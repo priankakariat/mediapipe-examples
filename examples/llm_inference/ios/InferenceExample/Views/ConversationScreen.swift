@@ -35,6 +35,8 @@ struct ConversationScreen: View {
   private enum FocusedField: Hashable {
     case message
   }
+  
+  @State private var isSheetPresented: Bool = false // Local state
 
   @FocusState
   private var focusedField: FocusedField?
@@ -79,7 +81,7 @@ struct ConversationScreen: View {
       }
     }
     .alert(
-      state: $viewModel.currentState,
+      error: viewModel.currentState.inferenceError,
       action: { [weak viewModel] in
         if shouldDismiss() {
           dismiss()
@@ -87,13 +89,21 @@ struct ConversationScreen: View {
           viewModel?.resetStateAfterErrorIntimation()
         }
       })
-    .onAppear { [weak viewModel] in
+    .sheet(isPresented: $viewModel.downloadRequired, onDismiss: didDismissDownloadSheet, content: {
+      HuggingFaceFlowScreen(viewModel: HuggingFaceFlowViewModel(modelCategory: self.viewModel.modelCategory))
+        .presentationDetents([.height(200)])
+    })
+    .onAppear {[weak viewModel] in
       viewModel?.loadModel()
     }
     .onDisappear { [weak viewModel] in
       viewModel?.clearModel()
     }
     
+  }
+  
+  func didDismissDownloadSheet() {
+    viewModel.loadModel()
   }
 
   private func shouldDismiss() -> Bool {
@@ -281,19 +291,19 @@ extension View {
   /// - Parameters:
   ///   - error: Binding error based on which the alert is displayed.
   /// - Returns: The error alert.
-  func alert(
-    state: Binding<ConversationViewModel.State>, buttonTitle: String = "OK",
+  func alert<E: LocalizedError>(
+    error: E?, buttonTitle: String = "OK",
     action: @escaping () -> Void
   ) -> some View {
 
-    let inferenceError = state.wrappedValue.inferenceError
+    let inferenceError = error
 
     return alert(isPresented: .constant(inferenceError != nil), error: inferenceError) { _ in
       Button(buttonTitle) {
         action()
       }
     } message: { error in
-      Text(error.failureReason)
+      Text(error.failureReason ?? "Some error occured")
     }
   }
 }

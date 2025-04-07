@@ -8,10 +8,20 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>aiedge.mediapipe.samples.llminference</string>
+			<string>com.mediapipe.InferenceExample.test</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>com.google.mediapipe.examples.llminference</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.mediapipe.InferenceExample.test</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.google.mediapipe.examples.inf</string>
 			</array>
 		</dict>
 	</array>

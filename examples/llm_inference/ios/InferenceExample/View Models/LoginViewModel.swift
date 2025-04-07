@@ -13,9 +13,54 @@
 // limitations under the License.
 
 import Foundation
+import SwiftUI
+import CryptoKit
 
 @MainActor
 class LoginViewModel: ObservableObject {
+  private let oauthService = OAuthService()
   
+  @Published var isAuthenticating = false
+  @Published var error: OAuthService.OAuthError? = nil
   
+  private var codeVerifier: String = ""
+  
+  func getAuthorizationUrl() -> URL? {
+    isAuthenticating = true
+    do {
+      let url = try oauthService.getAuthorizationURL()
+      return url
+    }
+    catch let error as OAuthService.OAuthError {
+      self.error = error
+    }
+    catch {
+      
+    }
+    return nil
+  }
+  
+  func handleCallback(_ callbackURL: URL?) async -> Bool {
+    defer {
+      isAuthenticating = false
+    }
+    guard let callbackURL = callbackURL,
+       let code = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?
+      .queryItems?
+      .first(where: { $0.name == "code" })?.value else {
+      self.error = OAuthService.OAuthError.internalError
+      return false
+    }
+      do {
+          try await oauthService.exchangeCodeForToken(code: code)
+          return true
+        } catch let error as OAuthService.OAuthError {
+          self.error = error
+        }
+      catch {
+      }
+    
+    return false
+    
+  }
 }
