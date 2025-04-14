@@ -35,8 +35,8 @@ struct ConversationScreen: View {
   private enum FocusedField: Hashable {
     case message
   }
-  
-  @State private var isSheetPresented: Bool = false // Local state
+
+  @State private var isSheetPresented: Bool = false  // Local state
 
   @FocusState
   private var focusedField: FocusedField?
@@ -71,9 +71,13 @@ struct ConversationScreen: View {
       }
       .navigationTitle(Constants.navigationTitle)
       .navigationBarTitleDisplayMode(.inline)
+      .toolbarBackground(Color("AppColor"), for: .navigationBar)
+      .toolbarBackground(.visible, for: .navigationBar)
+      .toolbarColorScheme(.dark, for: .navigationBar)
       .disabled(shouldDisableClicks())
 
       if viewModel.currentState == .loadingModel {
+        let _ = print("Loading model..........xxxxxxxxx")
         Constants.alertBackgroundColor
           .edgesIgnoringSafeArea(.all)
         ProgressView(Constants.modelInitializationAlertText)
@@ -88,22 +92,31 @@ struct ConversationScreen: View {
         } else {
           viewModel?.resetStateAfterErrorIntimation()
         }
-      })
-    .sheet(isPresented: $viewModel.downloadRequired, onDismiss: didDismissDownloadSheet, content: {
-      HuggingFaceFlowScreen(viewModel: HuggingFaceFlowViewModel(modelCategory: self.viewModel.modelCategory))
-        .presentationDetents([.height(200)])
-    })
-    .onAppear {[weak viewModel] in
+      }
+    )
+    .sheet(
+      isPresented: $viewModel.downloadRequired, onDismiss: didDismissDownloadSheet,
+      content: {
+        HuggingFaceFlowScreen(
+          viewModel: HuggingFaceFlowViewModel(modelCategory: self.viewModel.modelCategory)
+        )
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+      }
+    )
+    .onAppear { [weak viewModel] in
       viewModel?.loadModel()
     }
     .onDisappear { [weak viewModel] in
       viewModel?.clearModel()
     }
-    
   }
-  
+
   func didDismissDownloadSheet() {
-    viewModel.loadModel()
+    print("Instance______ \(ObjectIdentifier(viewModel))")
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+      viewModel.handleModelDownloadedCompleted()
+    }
   }
 
   private func shouldDismiss() -> Bool {
@@ -296,9 +309,7 @@ extension View {
     action: @escaping () -> Void
   ) -> some View {
 
-    let inferenceError = error
-
-    return alert(isPresented: .constant(inferenceError != nil), error: inferenceError) { _ in
+    return alert(isPresented: .constant(error != nil), error: error) { _ in
       Button(buttonTitle) {
         action()
       }

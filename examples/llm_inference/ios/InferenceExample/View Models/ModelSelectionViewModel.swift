@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import Foundation
-
 import SwiftUI
 
 enum NavigationDestination: CaseIterable {
@@ -22,18 +21,15 @@ enum NavigationDestination: CaseIterable {
   case download
 }
 
-
 // ViewModel to handle navigation logic
 class ModelSelectionViewModel: ObservableObject {
   // Example conditions to trigger navigation
   func navigationDestination(model: Model) -> NavigationDestination {
     if let _ = try? model.modelPath {
       return .conversation
-    }
-    else if let _ = KeyChainHelper.load(key: "token") {
+    } else if let _ = KeyChainHelper.load(key: "token") {
       return .download
-    }
-    else {
+    } else {
       return .login
     }
   }

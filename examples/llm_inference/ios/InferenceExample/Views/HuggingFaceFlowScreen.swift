@@ -1,4 +1,4 @@
-// Copyright 2024 The Mediapipe Authors.
+// Copyright 2025 The Mediapipe Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,88 +12,59 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import SwiftUI
 import AuthenticationServices
 import CryptoKit
+import SwiftUI
 
 struct HuggingFaceFlowScreen: View {
   @ObservedObject var viewModel: HuggingFaceFlowViewModel
   @Environment(\.dismiss) var dismiss
 
+  /// Persists the Download VM. `HuggingFaceFlowScreen` gets refreshed by SwiftUI based on its internal view life cycle.
+  /// Eg: presenting alerts refreshes the view. VM is being persisted to persist its state through refreshes.
+  @StateObject var downloadViewModel: DownloadViewModel
+
+  init(viewModel: HuggingFaceFlowViewModel) {
+    self._viewModel = ObservedObject(wrappedValue: viewModel)
+    self._downloadViewModel = StateObject(
+      wrappedValue: DownloadViewModel(
+        modelCategory: viewModel.modelCategory
+      ))
+  }
+
   var body: some View {
     VStack {
       switch viewModel.action {
-        case .login:
-          let _ = print("Rendering login view")
-          LoginView {
-            print("Login success callback")
-            viewModel.handleLoginSuccess()
-//            print("Action after login: \(viewModel.action)")
-          }
-        case .acknowledgeLicense(let url, let key):
-          let _ = print("Rendering license view")
-          AcknowledgeLicenseView(viewModel: AcknowledgeLicenseViewModel(url: url, licenseAcknowledgedKey: key)) {
-            print("License acknowledged callback")
-            viewModel.updateState()
-          }
-        case .download:
-          let _ = print("Rendering download view")
-          DownloadView(viewModel: DownloadViewModel(url: viewModel.modelCategory.downloadUrl, licenseAcknowledgedKey: viewModel.modelCategory.licenseAcnowledgedKey)) {
-            if viewModel.shouldDismiss() {
-              dismiss()
-            }
-          }
+      case .acknowledgeLicense:
+        /// Cannot persist `acknowledgeLicenseViewModel` similar to the download VM since some models don't have an acknowledge license view.
+        /// @StateObject cannot be an optional. Hence recreating VM each time the view is refreshed.
+        /// The enabling and disabling of continue button on refresh is handled internally.
+        let acknowledgeLicenseViewModel = AcknowledgeLicenseViewModel(
+          url: viewModel.modelCategory.licenseUrl!,
+          licenseAcknowledgedKey: viewModel.modelCategory.licenseAcnowledgedKey)
+        AcknowledgeLicenseView(viewModel: acknowledgeLicenseViewModel) {
+          viewModel.updateState()
+        }
+      case .download:
+        DownloadView(viewModel: downloadViewModel) {
+          viewModel.updateState()
+          dismiss()
+        }
       }
     }
-    }
-    
-//    switch viewModel.action {
-//      case .login:
-//        let _ = print("logged in")
-//        LoginView {
-//          print("Done alright")
-//          viewModel.handleLoginSuccess()
-//          print(viewModel.action)
-//        }
-//      case .acknowledgeLicense(let url, let key):
-//        let _ = print("Presenting license view")
-//        AcknowledgeLicenseView(viewModel: AcknowledgeLicenseViewModel(url: url, licenseAcknowledgedKey: key)) {
-//          let _ = print("license viewed flow")
-//          viewModel.updateState()
-//        }
-//      case .download:
-//        let _ = print("Present Download view")
-//        DownloadView(viewModel: DownloadViewModel(url: viewModel.modelCategory.downloadUrl, licenseAcknowledgedKey: viewModel.modelCategory.licenseAcnowledgedKey)) {
-//          if viewModel.shouldDismiss() {
-//            dismiss()
-//          }
-//        }
-//    }
+    .alert(
+      error: downloadViewModel.state.error,
+      action: { [weak downloadViewModel] in
+        guard let networkError = downloadViewModel?.state.error?.networkError else {
+          return
+        }
+        switch networkError {
+        case .forbidden:
+          viewModel.updateState()
+        default:
+          downloadViewModel?.state = .notInitiated
+          break
+        }
+      })
   }
-  
-//  @ViewBuilder
-//  private var content: some View {
-//    switch action {
-//      case .login:
-//        let _ = print("Rendering login view")
-//        LoginView {
-//          print("Login success callback")
-//          viewModel.handleLoginSuccess()
-//          print("Action after login: \(viewModel.action)")
-//        }
-//      case .acknowledgeLicense(let url, let key):
-//        let _ = print("Rendering license view")
-//        AcknowledgeLicenseView(viewModel: AcknowledgeLicenseViewModel(url: url, licenseAcknowledgedKey: key)) {
-//          print("License acknowledged callback")
-//          viewModel.updateState()
-//        }
-//      case .download:
-//        let _ = print("Rendering download view")
-//        DownloadView(viewModel: DownloadViewModel(url: viewModel.modelCategory.downloadUrl, licenseAcknowledgedKey: viewModel.modelCategory.licenseAcnowledgedKey)) {
-//          if viewModel.shouldDismiss() {
-//            dismiss()
-//          }
-//        }
-//    }
-//  }
-//}
+}

@@ -15,39 +15,68 @@
 import SwiftUI
 
 struct RoundedRectButtonStyle: ButtonStyle {
-  var backgroundColor: Color = .purple
-  var foregroundColor: Color = .white
+  private struct Constants {
+    static let horizontalPadding: CGFloat = 20
+    static let verticalPadding: CGFloat = 10
+    static let shadowColor: Color = .black.opacity(0.2)
+    static let animationDuration: CGFloat = 0.2
+    static let disabledBackgroundColor: Color = .gray.opacity(0.5)
+    static let disabledForegroundColor: Color = .gray
+  }
+
+  var backgroundColor: Color
+  var foregroundColor: Color
   var cornerRadius: CGFloat = 10
   var shadowRadius: CGFloat = 3
-  private let horizontalPadding: CGFloat = 20
-  private let verticalPadding: CGFloat = 10
-  
+  var isDisabled: Bool = false
+
   func makeBody(configuration: Configuration) -> some View {
-    configuration.label
-      .padding(.horizontal, horizontalPadding)
-      .padding(.vertical, verticalPadding)
-      .background(backgroundColor)
-      .foregroundColor(foregroundColor)
-      .cornerRadius(cornerRadius)
-      .shadow(color: Color.black.opacity(0.2), radius: shadowRadius, x: 0, y: 2)
-      .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-      .animation(.easeOut(duration: 0.2), value: configuration.isPressed)
+    HStack(spacing: 8) {
+      configuration.label
+    }
+    .padding(.horizontal, Constants.horizontalPadding)
+    .padding(.vertical, Constants.verticalPadding)
+    .background(isDisabled ? Constants.disabledBackgroundColor : backgroundColor)
+    .foregroundColor(isDisabled ? Constants.disabledForegroundColor : foregroundColor)
+    .cornerRadius(cornerRadius)
+    .shadow(color: Constants.shadowColor, radius: shadowRadius, x: 0, y: 2)
+    .scaleEffect(configuration.isPressed && !isDisabled ? 0.95 : 1.0)
+    .animation(.easeOut(duration: Constants.animationDuration), value: configuration.isPressed)
   }
 }
 
 struct RoundedRectButton: View {
+  private struct Constants {
+    static let logoSpacing: CGFloat = 8
+    static let logoSize: CGFloat = 20
+  }
+
   var title: String
   var action: () -> Void
   var cornerRadius: CGFloat = 30
   var shadowRadius: CGFloat = 3
   var disabled: Bool = false
-  
+  var logo: Image? = nil
+  var backgroundColor: Color = Color(red: 100.0 / 255.0, green: 85.0 / 255.0, blue: 170.0 / 255.0)
+  var foregroundColor: Color = Color.white
+
   var body: some View {
     Button(action: action) {
-      Text(title)
+      HStack(spacing: Constants.logoSpacing) {
+        if let logo = logo {
+          logo
+            .resizable()
+            .scaledToFit()
+            .frame(width: Constants.logoSize, height: Constants.logoSize)
+        }
+        Text(title)
+      }
     }
-    .buttonStyle(RoundedRectButtonStyle(cornerRadius: cornerRadius, shadowRadius: shadowRadius))
+    .buttonStyle(
+      RoundedRectButtonStyle(
+        backgroundColor: backgroundColor, foregroundColor: foregroundColor,
+        cornerRadius: cornerRadius, shadowRadius: shadowRadius, isDisabled: disabled)
+    )
     .disabled(disabled)
   }
 }
-

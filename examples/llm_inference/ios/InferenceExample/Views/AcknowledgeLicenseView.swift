@@ -1,4 +1,4 @@
-// Copyright 2024 The Mediapipe Authors.
+// Copyright 2025 The Mediapipe Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,78 +12,67 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import SwiftUI
 import AuthenticationServices
 import SafariServices
+import SwiftUI
+import WebKit
 
 struct SafariView: UIViewControllerRepresentable {
   let url: URL
-  
+
   func makeUIViewController(context: Context) -> SFSafariViewController {
     SFSafariViewController(url: url)
   }
-  
+
+  /// For `UIViewControllerRepresentable` protocol conformance.
   func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
 }
 
 struct AcknowledgeLicenseView: View {
-//  @EnvironmentObject var huggingFaceFlowViewModel: HuggingFaceFlowViewModel // Access the ParentViewModel
-  @Environment(\.webAuthenticationSession) private var webAuthenticationSession
+  private struct Constants {
+    static let instructionFontColor = Color.secondary
+    static let acknowledgeLicenseButtonBackgroundColor = Color.black
+    static let acknowledgeLicenseButtonTitle = "Acknowledge License"
+    static let continueButtonTitle = "Continue"
+    static let huggingFaceLogoName = "HfLogo"
+    static let instructionText = """
+      When you click on acknowledge license, you will be redirected to the model page on Hugging Face. \
+      Please scroll down, log in to Hugging Face, and then click on "Acknowledge License".
+      """
+  }
 
   @State private var showingWebView = false
   @ObservedObject var viewModel: AcknowledgeLicenseViewModel
-  
-  @Environment(\.openURL) private var openURL
-  @Environment(\.scenePhase) private var scenePhase
 
   let onLicenseViewed: () -> Void
-  
+
   var body: some View {
     VStack {
-      let _ = print("license view")
-      RoundedRectButton(title: "Acknowledge License") {
-//        Task {
-//          do {
-//            let urlWithToken = try await webAuthenticationSession.authenticate(
-//              using: viewModel.url,
-//              callback: ASWebAuthenticationSession.Callback.customScheme("com.google.mediapipe.examples.inf"),
-//              preferredBrowserSession: nil,
-//              additionalHeaderFields: [:]
-//            )
-//            print(urlWithToken)
-////            _ = await viewModel.handleCallback(urlWithToken)
-//          } catch ASWebAuthenticationSessionError.canceledLogin {
-//            // User dismissed the session without authenticating
-//            print("Authentication canceled by user")
-//            // isAuthenticating is already set to false by defer
-//          }
-//          catch {
-//            
-//          }
-//        }
-        showingWebView = true
-////        openURL(viewModel.url)
-////        viewModel.handleLicenseViewed()
-      }
-      
-      RoundedRectButton(title: "Continue", action: {
-        onLicenseViewed()
-      }, disabled: viewModel.isLicenseViewed)
+      Text(Constants.instructionText)
+        .font(.callout)
+        .foregroundStyle(Constants.instructionFontColor)
+        .padding()
+      RoundedRectButton(
+        title: Constants.acknowledgeLicenseButtonTitle,
+        action: {
+          showingWebView = true
+          viewModel.handleLicenseViewed()
+        }, logo: Image(Constants.huggingFaceLogoName),
+        backgroundColor: Constants.acknowledgeLicenseButtonBackgroundColor
+      )
+      .padding()
+      RoundedRectButton(
+        title: Constants.continueButtonTitle,
+        action: {
+          onLicenseViewed()
+        }, disabled: viewModel.disableContinue
+      )
+      .padding()
     }
-    .sheet(isPresented: $showingWebView, onDismiss: onDismiss, content: {
-      SafariView(url: viewModel.url)
-    })
-  }
-           
-//      WebView(url: viewModel.url)
-//        .edgesIgnoringSafeArea(.all)
-//    })
-//    .sheet(isPresented: $showingWebView, ond) {
-//      WebView(url: webURL)
-//        .edgesIgnoringSafeArea(.all)
-//    }
-  
-  func onDismiss() {
-    showingWebView = false
+    .sheet(
+      isPresented: $showingWebView, onDismiss: nil,
+      content: {
+        SafariView(url: viewModel.url)
+      })
   }
 }

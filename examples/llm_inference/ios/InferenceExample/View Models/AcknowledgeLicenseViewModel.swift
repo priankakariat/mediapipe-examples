@@ -1,4 +1,4 @@
-// Copyright 2024 The MediaPipe Authors.
+// Copyright 2025 The MediaPipe Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,25 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import CryptoKit
 import Foundation
 import SwiftUI
-import CryptoKit
+import WebKit
 
 @MainActor
 class AcknowledgeLicenseViewModel: ObservableObject {
   let url: URL
   let licenseAcknowledgedKey: String
-  
-  @Published var isLicenseViewed: Bool = false
-  
+
+  @Published var disableContinue: Bool = true
+
   init(url: URL, licenseAcknowledgedKey: String) {
     self.url = url
     self.licenseAcknowledgedKey = licenseAcknowledgedKey
+    disableContinue = KeychainHelper.load(key: licenseAcknowledgedKey) == nil
   }
-  
+
   func handleLicenseViewed() {
-    _ = KeyChainHelper.save(key: licenseAcknowledgedKey, value: "viewed")
-    isLicenseViewed = true
+    guard !licenseAcknowledgedKey.isEmpty else {
+      return
+    }
+
+    _ = KeychainHelper.save(key: licenseAcknowledgedKey, value: "viewed")
+    disableContinue = false
   }
-  
 }

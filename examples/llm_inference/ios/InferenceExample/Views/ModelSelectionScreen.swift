@@ -16,23 +16,17 @@ import SwiftUI
 
 struct ModelSelectionScreen: View {
   var body: some View {
-    NavigationStack() {
+    NavigationStack {
       List(Model.allCases, id: \.self) { model in
         NavigationLink(model.name, value: model)
       }
       .navigationTitle("Models")
       .navigationBarTitleDisplayMode(.inline)
+      .toolbarBackground(Color("AppColor"), for: .navigationBar)  // Set color here
+      .toolbarBackground(.visible, for: .navigationBar)  // Ensures the background is visible
+      .toolbarColorScheme(.dark, for: .navigationBar)  //
       .navigationDestination(for: Model.self) { model in
         ConversationScreen(viewModel: ConversationViewModel(modelCategory: model))
-//        if let _ = try? model.modelPath {
-//          ConversationScreen(viewModel: ConversationViewModel(modelCategory: model))
-//        }
-//        else if let _ = KeyChainHelper.load(key: "token") {
-//          DownloadView()
-//        }
-//        else {
-//          LoginView()
-//        }
       }
     }
   }

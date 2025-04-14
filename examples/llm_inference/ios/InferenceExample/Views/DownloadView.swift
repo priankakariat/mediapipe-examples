@@ -1,4 +1,4 @@
-// Copyright 2024 The Mediapipe Authors.
+// Copyright 2025 The Mediapipe Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,58 +12,124 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import AuthenticationServices
 import SwiftUI
 
-
 struct DownloadView: View {
-  
-  @EnvironmentObject var huggingFaceFlowViewModel: HuggingFaceFlowViewModel // Access the ParentViewModel
-  
+  private struct Constants {
+    static let progressViewTitle = "Downloading..."
+  }
+
+  // State to control alert presentation.
+  @State private var showErrorAlert = false
   @ObservedObject var viewModel: DownloadViewModel
   let onDownloadCompletion: () -> Void
 
   var body: some View {
-    
     ZStack {
-      RoundedRectButton(title: "Download") {
+
+      Group {
+        switch viewModel.state {
+        case .notInitiated, .loginRequired:
+          // Show button when not started or login is needed
+          DownloadButtonView(viewModel: viewModel)
+
+        case .progress:
+          // Show progress view when downloading
+          DownloadProgressView(viewModel: viewModel)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)  // Fill available space
+
+        case .completed:
+          // Show completion view
+          DownloadCompletedView(onDownloadCompletion: onDownloadCompletion)
+
+        case .error:
+          /// Show button again on error, allowing retry. For forbidden errors, the user will be redirected back to the license
+          /// acknowledgement screen.
+          DownloadButtonView(viewModel: viewModel)
+        // Consider showing the error message below the button or via an alert
+        }
+      }
+      .transition(.opacity)
+    }
+    .onDisappear { [weak viewModel] in
+      viewModel?.cancelDownload()
+    }
+    .animation(.easeInOut(duration: 0.3), value: viewModel.state)
+  }
+}
+
+/// Component for the initial/download button state
+struct DownloadButtonView: View {
+  @Environment(\.webAuthenticationSession) private var webAuthenticationSession
+  @ObservedObject var viewModel: DownloadViewModel
+
+  var buttonTitle: String {
+    var title = "Download \(viewModel.modelName)"
+    if viewModel.authRequired {
+      title = "Sign in and " + title
+    }
+
+    return title
+  }
+
+  var body: some View {
+    RoundedRectButton(title: buttonTitle) {
+      if viewModel.authRequired {
+        Task { await performAuthentication() }
+      } else {
         viewModel.download()
       }
-      if viewModel.state == .progress {
-        VStack {
-          ProgressView(value: viewModel.progress, total: 100.0) {
-            Text("Processing..")
-          } currentValueLabel: {
-            Text("Current progress: \(Int(viewModel.progress))%")
-          }
-          .padding()
-          RoundedRectButton(title: "Cancel") {
-          }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity) // Fill the frame
-        .alert(
-          error: viewModel.state.error,
-          action: { [weak viewModel] in
-            if viewModel?.handleDownloadErrorDismissed() == true {
-              onDownloadCompletion()
-            }
-          })
-//        .alert(item: $viewModel.state) { error in
-//          Alert(
-//            title: Text(error.errorDescription!),
-//            message: Text(error.failureReason),
-//            dismissButton: .default(Text("OK")) {
-//              // Optional: Perform actions on dismiss
-//              viewModel.error = nil //Clear the error after showing the alert
-//            }
-//          )
-      }
     }
-    .onChange(of: viewModel.state) {_, newState in
-      if newState == .completed {
-        onDownloadCompletion()
+  }
+
+  private func performAuthentication() async {
+    guard let url = viewModel.getAuthorizationUrl() else { return }
+    do {
+      let urlWithToken = try await webAuthenticationSession.authenticate(
+        using: url,
+        callback: ASWebAuthenticationSession.Callback.customScheme(
+          "com.google.mediapipe.examples.llminference"),
+        preferredBrowserSession: .ephemeral,
+        additionalHeaderFields: [:]
+      )
+
+      if await viewModel.handleAuthenticationCallback(urlWithToken) {
+        viewModel.download()
+      }
+    } catch {
+      viewModel.handleWebAuthenticationError(error)
+    }
+  }
+}
+
+/// Component for the progress state
+struct DownloadProgressView: View {
+  @ObservedObject var viewModel: DownloadViewModel
+
+  var body: some View {
+    VStack {
+      ProgressView(value: viewModel.progress, total: 100.0) {
+        Text("Downloading...")
+      } currentValueLabel: {
+        Text("Current progress: \(Int(viewModel.progress))%")
+      }
+      .padding()
+      .accentColor(Color("AppColor"))
+
+      RoundedRectButton(title: "Cancel") {
+        viewModel.cancelDownload()
       }
     }
   }
 }
 
-  
+/// Component for the completed state
+struct DownloadCompletedView: View {
+  let onDownloadCompletion: () -> Void
+
+  var body: some View {
+    Text("Download Completed!")
+      .onAppear(perform: onDownloadCompletion)
+  }
+}

@@ -14,85 +14,6 @@
 
 import Foundation
 
-/// Holds the names of the models names that can be  used.
-enum Model: CaseIterable {
-  case gemmaCPU
-  case gemmaGPU
-  
-  private var path: (name: String, extension: String) {
-    switch self {
-      case .gemmaCPU:
-        return ("gemma-2b-it-cpu-int4", "bin")
-      case .gemmaGPU:
-        return ("gemma-2b-it-gpu-int4", "bin")
-    }
-  }
-  
-  var licenseAcnowledgedKey: String {
-    switch self {
-      case .gemmaCPU:
-        return "gemma-cpu-license"
-      case .gemmaGPU:
-        return "gemma-gpu-license"
-    }
-  }
-  
-  var modelPath: String {
-    get throws {
-      let documentsDirectory = try FileManager.default.url(
-        for: .documentDirectory,
-        in: .userDomainMask,
-        appropriateFor: nil,
-        create: true
-      )
-      
-      let docsURL = documentsDirectory.appendingPathComponent("\(path.name).\(path.extension)")
-      
-      if FileManager.default.fileExists(atPath: docsURL.path) {
-        print("file")
-        return docsURL.path
-      }
-      
-      guard
-        let path = Bundle.main.path(
-          forResource: path.name, ofType: path.extension)
-      else {
-        throw InferenceError.modelFileNotFound(modelName: "\(path.name).\(path.extension)")
-      }
-      return path
-    }
-  }
-  
-  var name: String {
-    switch self {
-      case .gemmaCPU:
-        return "Gemma CPU"
-      case .gemmaGPU:
-        return "Gemma GPU"
-    }
-  }
-  
-  var downloadUrl: URL? {
-    switch self {
-      case .gemmaCPU:
-        return URL(string: "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4.task")
-      case .gemmaGPU:
-        return URL(string: "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4.task")
-    }
-  }
-  
-  var licenseUrl: URL? {
-    switch self {
-      case .gemmaCPU:
-        return URL(string: "https://huggingface.co/litert-community/Gemma3-1B-IT")
-      case .gemmaGPU:
-        return URL(string: "https://huggingface.co/litert-community/Gemma3-1B-IT")
-    }
-  }
-  
-}
-
-
 @MainActor
 class ConversationViewModel: ObservableObject {
   /// This array holds both the view models responsible for presentation of both user and system messages
@@ -140,9 +61,9 @@ class ConversationViewModel: ObservableObject {
 
   /// Based on this property updates are made to the UI State including enabling and disabling of messaging, other buttons etc.
   @Published var currentState: State = .idle
-  
-  @Published var downloadRequired: Bool = false
-    
+
+  @Published var downloadRequired: Bool = true
+
   /// Model to initialize.
   var modelCategory: Model
 
@@ -155,10 +76,14 @@ class ConversationViewModel: ObservableObject {
   init(modelCategory: Model) {
     self.modelCategory = modelCategory
     downloadRequired = (try? modelCategory.modelPath) == nil
-    currentState = downloadRequired ? .idle : .loadingModel
   }
 
   func loadModel() {
+    guard currentState == .idle else {
+      return
+    }
+    
+    currentState = .loadingModel
     Task {
       load(modelCategory: modelCategory)
     }
@@ -170,11 +95,13 @@ class ConversationViewModel: ObservableObject {
     currentState = .loadingModel
   }
 
+  func handleModelDownloadedCompleted() {
+    downloadRequired = false
+    currentState = .idle
+    loadModel()
+  }
+
   private func load(modelCategory: Model) {
-    guard !downloadRequired else {
-      return
-    }
-    
     do {
       /// Gets updated to done or error in `startNewChat()` if there is an error in chat initialization.
       currentState = .loadingModel
@@ -234,12 +161,10 @@ class ConversationViewModel: ObservableObject {
   }
 
   private func formatPrompt(text: String) -> String {
-    let startTurn = "<start_of_turn>"
-    let endTurn = "<end_of_turn>"
-    let userPrefix = "user"
-    let modelPrefix = "model"
+    let conversationMarkers = modelCategory.conversationMarkers
 
-    return "\(startTurn)\(userPrefix)\n\(text)\(endTurn)\(startTurn)\(modelPrefix)"
+    return
+      "\(conversationMarkers.startOfTurn)\(conversationMarkers.userPrefix)\n\(text)\(conversationMarkers.endOfTurn)\(conversationMarkers.startOfTurn)\(conversationMarkers.modelPrefix)"
   }
 
   private func updateSystemViewModel(
@@ -252,7 +177,9 @@ class ConversationViewModel: ObservableObject {
     currentState = .streamingResponse
     do {
       for try await partialResult in responseStream {
-        messageVM.update(text: partialResult)
+        messageVM.update(
+          text: partialResult.replacingOccurrences(
+            of: modelCategory.conversationMarkers.endOfTurn, with: ""))
       }
     } catch {
 
@@ -290,7 +217,7 @@ class ConversationViewModel: ObservableObject {
     defer { systemViewModel.closeSystemMessage() }
 
     do {
-      let prompt = formatPrompt(text:text)
+      let prompt = formatPrompt(text: text)
       let responseStream = try await chat.sendMessage(prompt)
 
       await updateSystemViewModel(systemViewModel, responseStream: responseStream)
