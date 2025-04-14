@@ -29,6 +29,7 @@
 		AA673F632DAD89D90066441A /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA673F622DAD89D90066441A /* KeychainHelper.swift */; };
 		AA673F6E2DAD8A900066441A /* Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA673F6D2DAD8A900066441A /* Model.swift */; };
 		AA673F702DAD8B130066441A /* AuthConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA673F6F2DAD8B130066441A /* AuthConfig.swift */; };
+		AA673F722DAD8F350066441A /* Metadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA673F712DAD8F350066441A /* Metadata.swift */; };
 		AA9212892D65F55200C12E69 /* MessageViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9212882D65F55200C12E69 /* MessageViewModel.swift */; };
 /* End PBXBuildFile section */
 
@@ -57,6 +58,7 @@
 		AA673F622DAD89D90066441A /* KeychainHelper.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
 		AA673F6D2DAD8A900066441A /* Model.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Model.swift; sourceTree = "<group>"; };
 		AA673F6F2DAD8B130066441A /* AuthConfig.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AuthConfig.swift; sourceTree = "<group>"; };
+		AA673F712DAD8F350066441A /* Metadata.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Metadata.swift; sourceTree = "<group>"; };
 		AA9212882D65F55200C12E69 /* MessageViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MessageViewModel.swift; sourceTree = "<group>"; };
 		E0D7FB7ACC6233403D36FDF8 /* Pods-InferenceExample.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-InferenceExample.debug.xcconfig"; path = "Target Support Files/Pods-InferenceExample/Pods-InferenceExample.debug.xcconfig"; sourceTree = "<group>"; };
 		F02369998C59A0B7AAC3A1D5 /* Pods_InferenceExample.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_InferenceExample.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -182,6 +184,7 @@
 		AA673F682DAD8A5C0066441A /* Types */ = {
 			isa = PBXGroup;
 			children = (
+				AA673F712DAD8F350066441A /* Metadata.swift */,
 				AA673F6D2DAD8A900066441A /* Model.swift */,
 				AA673F6F2DAD8B130066441A /* AuthConfig.swift */,
 			);
@@ -297,6 +300,7 @@
 				8DCF4C582B992B9C00427D77 /* ConversationViewModel.swift in Sources */,
 				AA5D86C72DA5451B00F5FEF1 /* HuggingFaceFlowViewModel.swift in Sources */,
 				AA5D86BA2D96E81D00F5FEF1 /* DownloadViewModel.swift in Sources */,
+				AA673F722DAD8F350066441A /* Metadata.swift in Sources */,
 				AA673F6E2DAD8A900066441A /* Model.swift in Sources */,
 				AA9212892D65F55200C12E69 /* MessageViewModel.swift in Sources */,
 				8DCF4C452B99289E00427D77 /* InferenceExampleApp.swift in Sources */,

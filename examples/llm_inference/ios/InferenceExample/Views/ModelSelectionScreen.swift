@@ -22,7 +22,7 @@ struct ModelSelectionScreen: View {
       }
       .navigationTitle("Models")
       .navigationBarTitleDisplayMode(.inline)
-      .toolbarBackground(Color("AppColor"), for: .navigationBar)  // Set color here
+      .toolbarBackground(Metadata.globalColor, for: .navigationBar)  // Set color here
       .toolbarBackground(.visible, for: .navigationBar)  // Ensures the background is visible
       .toolbarColorScheme(.dark, for: .navigationBar)  //
       .navigationDestination(for: Model.self) { model in

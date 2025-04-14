@@ -74,7 +74,7 @@ struct DownloadButtonView: View {
   }
 
   var body: some View {
-    RoundedRectButton(title: buttonTitle) {
+    HuggingFaceButton(title: buttonTitle) {
       if viewModel.authRequired {
         Task { await performAuthentication() }
       } else {
@@ -115,7 +115,7 @@ struct DownloadProgressView: View {
         Text("Current progress: \(Int(viewModel.progress))%")
       }
       .padding()
-      .accentColor(Color("AppColor"))
+      .accentColor(Metadata.globalColor)
 
       RoundedRectButton(title: "Cancel") {
         viewModel.cancelDownload()

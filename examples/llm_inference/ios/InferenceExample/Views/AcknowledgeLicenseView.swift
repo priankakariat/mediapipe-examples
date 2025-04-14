@@ -31,10 +31,8 @@ struct SafariView: UIViewControllerRepresentable {
 struct AcknowledgeLicenseView: View {
   private struct Constants {
     static let instructionFontColor = Color.secondary
-    static let acknowledgeLicenseButtonBackgroundColor = Color.black
     static let acknowledgeLicenseButtonTitle = "Acknowledge License"
     static let continueButtonTitle = "Continue"
-    static let huggingFaceLogoName = "HfLogo"
     static let instructionText = """
       When you click on acknowledge license, you will be redirected to the model page on Hugging Face. \
       Please scroll down, log in to Hugging Face, and then click on "Acknowledge License".
@@ -52,14 +50,10 @@ struct AcknowledgeLicenseView: View {
         .font(.callout)
         .foregroundStyle(Constants.instructionFontColor)
         .padding()
-      RoundedRectButton(
-        title: Constants.acknowledgeLicenseButtonTitle,
-        action: {
-          showingWebView = true
-          viewModel.handleLicenseViewed()
-        }, logo: Image(Constants.huggingFaceLogoName),
-        backgroundColor: Constants.acknowledgeLicenseButtonBackgroundColor
-      )
+      HuggingFaceButton(title: Constants.acknowledgeLicenseButtonTitle) {
+        showingWebView = true
+        viewModel.handleLicenseViewed()
+      }
       .padding()
       RoundedRectButton(
         title: Constants.continueButtonTitle,

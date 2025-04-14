@@ -71,17 +71,16 @@ struct ConversationScreen: View {
       }
       .navigationTitle(Constants.navigationTitle)
       .navigationBarTitleDisplayMode(.inline)
-      .toolbarBackground(Color("AppColor"), for: .navigationBar)
+      .toolbarBackground(Metadata.globalColor, for: .navigationBar)
       .toolbarBackground(.visible, for: .navigationBar)
       .toolbarColorScheme(.dark, for: .navigationBar)
       .disabled(shouldDisableClicks())
 
       if viewModel.currentState == .loadingModel {
-        let _ = print("Loading model..........xxxxxxxxx")
         Constants.alertBackgroundColor
           .edgesIgnoringSafeArea(.all)
         ProgressView(Constants.modelInitializationAlertText)
-          .tint(.accentColor)
+          .tint(Metadata.globalColor)
       }
     }
     .alert(

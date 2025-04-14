@@ -57,7 +57,7 @@ struct RoundedRectButton: View {
   var shadowRadius: CGFloat = 3
   var disabled: Bool = false
   var logo: Image? = nil
-  var backgroundColor: Color = Color(red: 100.0 / 255.0, green: 85.0 / 255.0, blue: 170.0 / 255.0)
+  var backgroundColor: Color = Metadata.globalColor
   var foregroundColor: Color = Color.white
 
   var body: some View {
@@ -78,5 +78,22 @@ struct RoundedRectButton: View {
         cornerRadius: cornerRadius, shadowRadius: shadowRadius, isDisabled: disabled)
     )
     .disabled(disabled)
+  }
+}
+
+struct HuggingFaceButton: View {
+  var title: String
+  var action: () -> Void
+  var disabled: Bool = false
+  
+  var body: some View {
+    RoundedRectButton(
+      title: title,
+      action: action,
+      disabled: disabled,
+      logo: Image("HfLogo"), // Hardcoded logo
+      backgroundColor: .black, // Fixed black background
+      foregroundColor: .white // Fixed white foreground
+    )
   }
 }
